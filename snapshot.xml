@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE project>
+
+<project name="Bolt" default="run" basedir=".">
+
+	<tstamp />
+	<property name="version" value="1.0-SNAPSHOT" />
+
+	<target name="run" depends="clean">
+		<mkdir dir="build/" />
+		<mkdir dir="build/bin" />
+		<mkdir dir="build/lib" />
+		<mkdir dir="build/doc" />
+		<mkdir dir="build/jar" />
+		<path id="classpath">
+			<fileset dir="lib">
+				<include name="**/*.jar" />
+				<exclude name="**/*javadoc*.jar" />
+			</fileset>
+		</path>
+		<javac srcdir="src" destdir="build/bin" classpathref="classpath" />
+		<unzip dest="build/lib">
+			<fileset dir="lib">
+				<include name="**/*.jar" />
+				<exclude name="**/*javadoc*.jar" />
+			</fileset>
+			<patternset>
+				<include name="**/*.class" />
+			</patternset>
+		</unzip>
+		<copy todir="build/doc">
+			<fileset dir=".">
+				<include name="README.md" />
+				<include name="NOTICE.md" />
+				<include name="LICENSE.md" />
+			</fileset>
+		</copy>
+		<jar jarfile="build/jar/Bolt-${version}.jar" manifest="MANIFEST.MF">
+			<fileset dir="build/bin" />
+			<fileset dir="build/lib" />
+		</jar>
+		<zip destfile="build/Bolt-${DSTAMP}.zip">
+			<fileset dir="build/doc" />
+			<fileset dir="build/jar/" />
+		</zip>
+	</target>
+
+	<target name="clean">
+		<delete dir="build" />
+	</target>
+
+</project>
