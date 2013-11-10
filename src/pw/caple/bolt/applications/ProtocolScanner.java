@@ -1,4 +1,4 @@
-package pw.caple.bolt;
+package pw.caple.bolt.applications;
 
 import java.io.File;
 import java.io.IOException;
@@ -11,7 +11,6 @@ import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
-import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.text.DateFormat;
@@ -28,14 +27,20 @@ import java.util.regex.Pattern;
 import pw.caple.bolt.api.Client;
 import pw.caple.bolt.api.Protocol;
 
-public class ProtocolRegistry {
+public class ProtocolScanner {
 
-	private final Pattern regex = Pattern.compile("[^\\s\"']+|\"([^\"]*)\"|'([^']*)'");
+	//TODO: search jars and other places than just bin
+
+	private final static Pattern regex = Pattern.compile("[^\\s\"']+|\"([^\"]*)\"|'([^']*)'");
+
 	private final Map<String, List<Method>> methods = new ConcurrentHashMap<>();
+	private final ClassLoader classLoader;
+	private final File appRoot;
 
-	public ProtocolRegistry(ClassLoader loader) {
-
-		for (Method method : queryProtocolMethods("pw/caple/bolt")) {
+	public ProtocolScanner(File appRoot, ClassLoader classLoader) {
+		this.appRoot = appRoot;
+		this.classLoader = classLoader;
+		for (Method method : queryProtocolMethods()) {
 			String methodName = method.getName();
 			if (!methods.containsKey(method.getName())) {
 				methods.put(methodName, new CopyOnWriteArrayList<Method>());
@@ -45,22 +50,22 @@ public class ProtocolRegistry {
 		}
 	}
 
-	private List<Method> queryProtocolMethods(String rootPackage) {
+	private List<Method> queryProtocolMethods() {
 		final List<Method> methods = new ArrayList<>();
-		final ClassLoader loader = ProtocolRegistry.class.getClassLoader();
-		String root = loader.getResource(rootPackage).getPath();
 		try {
-			Path searchIn = Paths.get(new File(root).getCanonicalPath());
-			final int packageIndex = searchIn.toAbsolutePath().toString().length() - rootPackage.length();
-			final PathMatcher matcher = searchIn.getFileSystem().getPathMatcher("glob:**/*.class");
-			Files.walkFileTree(searchIn, new SimpleFileVisitor<Path>() {
+			File binFolder = new File(appRoot, "bin").getCanonicalFile();
+			Path binPath = binFolder.toPath();
+			final int packageIndex = binPath.toString().length();
+			final PathMatcher matcher = binPath.getFileSystem().getPathMatcher("glob:**/*.class");
+			Files.walkFileTree(binPath, new SimpleFileVisitor<Path>() {
 				@Override
 				public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
 					if (matcher.matches(file)) {
 						String name = file.toAbsolutePath().toString().substring(packageIndex);
-						name = name.substring(0, name.length() - 6).replace("/", ".").replace("\\", ".");
+						if (name.startsWith(File.separator)) name = name.substring(1);
+						name = name.substring(0, name.length() - 6).replace(File.separator, ".");
 						try {
-							Class<?> clazz = Class.forName(name, false, loader);
+							Class<?> clazz = Class.forName(name, false, classLoader);
 							for (Method method : clazz.getDeclaredMethods()) {
 								if (method.isAnnotationPresent(Protocol.class)) {
 									if (Modifier.isStatic(method.getModifiers())) {
@@ -69,7 +74,7 @@ public class ProtocolRegistry {
 										}
 										methods.add(method);
 									} else {
-										new Exception("Encountered non-static protocol method [" + method.getName() + "]. Protocol methods should always be static.").printStackTrace();
+										throw new RuntimeException("Encountered non-static protocol method [" + method.getName() + "]. Protocol methods should always be static.");
 									}
 								}
 							}
@@ -108,9 +113,9 @@ public class ProtocolRegistry {
 						return call(client, method, args);
 					}
 				}
-				client.sendErrorMessage(methodName + ": wrong number of parameters");
+				client.send("error " + methodName + ": wrong number of parameters");
 			} else {
-				client.sendErrorMessage(methodName + ": unknown command");
+				client.send("error " + methodName + ": unknown command");
 			}
 		}
 		return null;
@@ -118,7 +123,7 @@ public class ProtocolRegistry {
 
 	private boolean isTarget(Method method, String[] args) {
 		Class<?>[] params = method.getParameterTypes();
-		if (params.length > 0 && params[0] == Client.class) {
+		if (params.length > 0 && Client.class.isAssignableFrom(params[0])) {
 			if (method.isVarArgs() && args.length + 1 >= params.length) {
 				return true;
 			} else {
@@ -138,7 +143,7 @@ public class ProtocolRegistry {
 		Object[] args = new Object[params.length];
 		int offset = 0;
 		if (params.length > 0) {
-			if (params[0] == Client.class) {
+			if (Client.class.isAssignableFrom(params[0])) {
 				offset += 1;
 				args[0] = client;
 			}
@@ -158,7 +163,7 @@ public class ProtocolRegistry {
 				if (object != null) {
 					args[i] = object;
 				} else {
-					client.sendErrorMessage(method.getName() + ": syntax incorrect; expected "
+					client.send("error " + method.getName() + ": syntax incorrect; expected "
 							+ params[i].getSimpleName() + " for parameter " + (i - offset + 1));
 					return null;
 				}
@@ -246,8 +251,7 @@ public class ProtocolRegistry {
 				return null;
 			}
 		} else {
-			new Exception("unsupported parameter type [" + type.getSimpleName() + "] found in a protocol method").printStackTrace();
-			return null;
+			throw new RuntimeException("unsupported parameter type [" + type.getSimpleName() + "] found in a protocol method");
 		}
 	}
 

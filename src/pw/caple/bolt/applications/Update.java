@@ -1,4 +1,4 @@
-package pw.caple.bolt;
+package pw.caple.bolt.applications;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -20,6 +20,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.transport.FetchResult;
+import pw.caple.bolt.Bolt;
 import pw.caple.bolt.api.Client;
 import pw.caple.bolt.api.Protocol;
 import pw.caple.bolt.api.Protocol.SecurityClearance;
@@ -68,7 +69,7 @@ public class Update {
 					@Override
 					public void run() {
 						try {
-							Core.shutdown();
+							Bolt.shutdown();
 							update.exitAndUpdate();
 						} catch (Exception e) {
 							e.printStackTrace();
