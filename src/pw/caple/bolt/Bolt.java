@@ -1,14 +1,6 @@
 package pw.caple.bolt;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.util.Properties;
 import javax.tools.ToolProvider;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.HttpConfiguration;
@@ -35,7 +27,6 @@ public class Bolt {
 	private static ApplicationManager appManager;
 
 	private final static String serverPath = new File(Bolt.class.getProtectionDomain().getCodeSource().getLocation().getPath()).toString();
-	private final static Properties config = new Properties();
 
 	@Protocol
 	private static void stop() {
@@ -73,10 +64,6 @@ public class Bolt {
 		return serverPath;
 	}
 
-	public static Properties getConfig() {
-		return config;
-	}
-
 	public static void main(String[] args) throws Exception {
 
 		// Check of Java compiler is available
@@ -84,21 +71,6 @@ public class Bolt {
 			System.err.println("CRITICAL ERROR: Java compiler is inaccessible!");
 			System.err.println("Please ensure JAVA_HOME refers to the JDK instead of the JRE. -- Exiting.");
 			return;
-		}
-
-		// Setup config file
-		try {
-			File configFile = new File("bolt.conf");
-			if (!configFile.exists()) {
-				Path from = Paths.get("dev/default.properties");
-				Path to = Paths.get("bolt.conf");
-				Files.copy(from, to, StandardCopyOption.COPY_ATTRIBUTES);
-			}
-			InputStream stream = new FileInputStream(configFile);
-			config.load(stream);
-			stream.close();
-		} catch (IOException e) {
-			e.printStackTrace();
 		}
 
 		// Setup and start object database server
@@ -128,9 +100,9 @@ public class Bolt {
 
 		// Handle TLS HTTPS connections
 		SslContextFactory sslContextFactory = new SslContextFactory();
-		sslContextFactory.setKeyStorePath(getConfig().getProperty("ssl_keystore"));
-		sslContextFactory.setKeyStorePassword(getConfig().getProperty("ssl_password"));
-		sslContextFactory.setKeyManagerPassword(getConfig().getProperty("ssl_password"));
+		sslContextFactory.setKeyStorePath("dev/keystore");
+		sslContextFactory.setKeyStorePassword("boltdev");
+		sslContextFactory.setKeyManagerPassword("boltdev");
 		HttpConfiguration httpsConfig = new HttpConfiguration(httpConfig);
 		httpsConfig.addCustomizer(new SecureRequestCustomizer());
 		ServerConnector https = new ServerConnector(webServer,
