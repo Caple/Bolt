@@ -1,18 +1,11 @@
 package pw.caple.bolt.applications;
 
-import java.io.File;
-import java.io.IOException;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.PathMatcher;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
+import java.net.URLClassLoader;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -27,20 +20,41 @@ import java.util.regex.Pattern;
 import pw.caple.bolt.api.Client;
 import pw.caple.bolt.api.Protocol;
 
-public class ProtocolScanner {
+public class ProtocolEngine {
 
 	//TODO: search jars and other places than just bin
 
 	private final static Pattern regex = Pattern.compile("[^\\s\"']+|\"([^\"]*)\"|'([^']*)'");
 
 	private final Map<String, List<Method>> methods = new ConcurrentHashMap<>();
-	private final ClassLoader classLoader;
-	private final File appRoot;
+	private final ReservedProtocol reservedProtocol;
+	private final URLClassLoader classLoader;
 
-	public ProtocolScanner(File appRoot, ClassLoader classLoader) {
-		this.appRoot = appRoot;
+	public ProtocolEngine(URLClassLoader classLoader) {
 		this.classLoader = classLoader;
-		for (Method method : queryProtocolMethods()) {
+		reservedProtocol = new ReservedProtocol(this);
+		loadProtocolMethods();
+	}
+
+	private void loadProtocolMethods() {
+		Reflection reflection = new Reflection(classLoader);
+		for (Method method : reflection.getAnnotatedMethods(Protocol.class)) {
+			if (Modifier.isStatic(method.getModifiers())) {
+				if (!method.isAccessible()) {
+					method.setAccessible(true);
+				}
+				String methodName = method.getName();
+				if (!methods.containsKey(method.getName())) {
+					methods.put(methodName, new CopyOnWriteArrayList<Method>());
+				}
+				List<Method> methodList = methods.get(methodName);
+				methodList.add(method);
+			} else {
+				throw new RuntimeException("Error on method " + method.getName() + "() - Method should be static.");
+			}
+		}
+
+		for (Method method : reservedProtocol.getClass().getDeclaredMethods()) {
 			String methodName = method.getName();
 			if (!methods.containsKey(method.getName())) {
 				methods.put(methodName, new CopyOnWriteArrayList<Method>());
@@ -48,47 +62,7 @@ public class ProtocolScanner {
 			List<Method> methodList = methods.get(methodName);
 			methodList.add(method);
 		}
-	}
 
-	private List<Method> queryProtocolMethods() {
-		final List<Method> methods = new ArrayList<>();
-		try {
-			File binFolder = new File(appRoot, "bin").getCanonicalFile();
-			Path binPath = binFolder.toPath();
-			final int packageIndex = binPath.toString().length();
-			final PathMatcher matcher = binPath.getFileSystem().getPathMatcher("glob:**/*.class");
-			Files.walkFileTree(binPath, new SimpleFileVisitor<Path>() {
-				@Override
-				public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-					if (matcher.matches(file)) {
-						String name = file.toAbsolutePath().toString().substring(packageIndex);
-						if (name.startsWith(File.separator)) name = name.substring(1);
-						name = name.substring(0, name.length() - 6).replace(File.separator, ".");
-						try {
-							Class<?> clazz = Class.forName(name, false, classLoader);
-							for (Method method : clazz.getDeclaredMethods()) {
-								if (method.isAnnotationPresent(Protocol.class)) {
-									if (Modifier.isStatic(method.getModifiers())) {
-										if (!method.isAccessible()) {
-											method.setAccessible(true);
-										}
-										methods.add(method);
-									} else {
-										throw new RuntimeException("Encountered non-static protocol method [" + method.getName() + "]. Protocol methods should always be static.");
-									}
-								}
-							}
-						} catch (ClassNotFoundException e) {
-							e.printStackTrace();
-						}
-					}
-					return FileVisitResult.CONTINUE;
-				}
-			});
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return methods;
 	}
 
 	public Object processMessage(Client client, String message) {
@@ -113,9 +87,9 @@ public class ProtocolScanner {
 						return call(client, method, args);
 					}
 				}
-				client.send("error " + methodName + ": wrong number of parameters");
+				client.send("error \"" + methodName + ": wrong number of parameters\"");
 			} else {
-				client.send("error " + methodName + ": unknown command");
+				client.send("error \"" + methodName + ": unknown command\"");
 			}
 		}
 		return null;
@@ -163,14 +137,18 @@ public class ProtocolScanner {
 				if (object != null) {
 					args[i] = object;
 				} else {
-					client.send("error " + method.getName() + ": syntax incorrect; expected "
-							+ params[i].getSimpleName() + " for parameter " + (i - offset + 1));
+					client.send("error \"" + method.getName() + ": syntax incorrect; expected "
+							+ params[i].getSimpleName() + " for parameter " + (i - offset + 1) + "\"");
 					return null;
 				}
 			}
 		}
 		try {
-			return method.invoke(null, args);
+			if (method.getDeclaringClass() == ReservedProtocol.class) {
+				return method.invoke(reservedProtocol, args);
+			} else {
+				return method.invoke(null, args);
+			}
 		} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
 			e.printStackTrace();
 		}

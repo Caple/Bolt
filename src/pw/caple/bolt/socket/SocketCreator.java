@@ -4,14 +4,14 @@ import org.eclipse.jetty.websocket.api.UpgradeRequest;
 import org.eclipse.jetty.websocket.api.UpgradeResponse;
 import org.eclipse.jetty.websocket.servlet.WebSocketCreator;
 import pw.caple.bolt.api.Application;
-import pw.caple.bolt.applications.ProtocolScanner;
+import pw.caple.bolt.applications.ProtocolEngine;
 
 public class SocketCreator implements WebSocketCreator {
 
 	private final SocketConnection socket;
 
-	SocketCreator(Application application, ProtocolScanner protocolScanner) {
-		socket = new SocketConnection(application, protocolScanner);
+	SocketCreator(Application application, ProtocolEngine protocolEngine) {
+		socket = new SocketConnection(application, protocolEngine);
 	}
 
 	@Override

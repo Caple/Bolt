@@ -3,23 +3,23 @@ package pw.caple.bolt.socket;
 import org.eclipse.jetty.websocket.servlet.WebSocketServlet;
 import org.eclipse.jetty.websocket.servlet.WebSocketServletFactory;
 import pw.caple.bolt.api.Application;
-import pw.caple.bolt.applications.ProtocolScanner;
+import pw.caple.bolt.applications.ProtocolEngine;
 
 public class SocketServlet extends WebSocketServlet {
 
 	private static final long serialVersionUID = 5L;
 
 	private final Application application;
-	private final ProtocolScanner protocolScanner;
+	private final ProtocolEngine protocolEngine;
 
-	public SocketServlet(Application application, ProtocolScanner protocolScanner) {
+	public SocketServlet(Application application, ProtocolEngine protocolEngine) {
 		this.application = application;
-		this.protocolScanner = protocolScanner;
+		this.protocolEngine = protocolEngine;
 	}
 
 	@Override
 	public void configure(WebSocketServletFactory factory) {
 		factory.getPolicy().setIdleTimeout(120000);
-		factory.setCreator(new SocketCreator(application, protocolScanner));
+		factory.setCreator(new SocketCreator(application, protocolEngine));
 	}
 }

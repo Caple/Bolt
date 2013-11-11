@@ -8,7 +8,7 @@ import org.eclipse.jetty.websocket.api.WebSocketTimeoutException;
 import pw.caple.bolt.api.Application;
 import pw.caple.bolt.api.Client;
 import pw.caple.bolt.api.Protocol;
-import pw.caple.bolt.applications.ProtocolScanner;
+import pw.caple.bolt.applications.ProtocolEngine;
 
 public class SocketConnection implements WebSocketListener {
 
@@ -17,11 +17,11 @@ public class SocketConnection implements WebSocketListener {
 	private RemoteEndpoint remote;
 
 	private final Application application;
-	private final ProtocolScanner protocolScanner;
+	private final ProtocolEngine protocolEngine;
 
-	SocketConnection(Application application, ProtocolScanner protocolScanner) {
+	SocketConnection(Application application, ProtocolEngine protocolScanner) {
 		this.application = application;
-		this.protocolScanner = protocolScanner;
+		this.protocolEngine = protocolScanner;
 	}
 
 	public final void send(String message) {
@@ -108,7 +108,7 @@ public class SocketConnection implements WebSocketListener {
 
 	@Override
 	public void onWebSocketText(String message) {
-		protocolScanner.processMessage(client, message);
+		protocolEngine.processMessage(client, message);
 	}
 
 }
