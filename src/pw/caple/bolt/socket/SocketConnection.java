@@ -7,7 +7,6 @@ import org.eclipse.jetty.websocket.api.WebSocketListener;
 import org.eclipse.jetty.websocket.api.WebSocketTimeoutException;
 import pw.caple.bolt.api.Application;
 import pw.caple.bolt.api.Client;
-import pw.caple.bolt.api.Protocol;
 import pw.caple.bolt.applications.ProtocolEngine;
 
 public class SocketConnection implements WebSocketListener {
@@ -21,7 +20,7 @@ public class SocketConnection implements WebSocketListener {
 
 	SocketConnection(Application application, ProtocolEngine protocolScanner) {
 		this.application = application;
-		this.protocolEngine = protocolScanner;
+		protocolEngine = protocolScanner;
 	}
 
 	public final void send(String message) {
@@ -44,29 +43,6 @@ public class SocketConnection implements WebSocketListener {
 			}
 		}
 	}
-
-	@Protocol
-	static void PING(Client client) {
-		client.send("PONG");
-	}
-
-	//	@Protocol
-	//	private static void requestCallback(Client client, String callbackID, String... args) {
-	//		StringBuilder builder = new StringBuilder();
-	//		for (String arg : args) {
-	//			builder.append(arg);
-	//			builder.append(' ');
-	//		}
-	//		if (builder.length() > 0) {
-	//			builder.setLength(builder.length() - 1);
-	//		}
-	//		Object returnValue = Bolt.getProtocolCore().processMessage(client, builder.toString());
-	//		if (returnValue != null) {
-	//			client.send("callback " + callbackID + " " + returnValue.toString());
-	//		} else {
-	//			client.send("callback " + callbackID);
-	//		}
-	//	}
 
 	@Override
 	public void onWebSocketBinary(byte[] payload, int offset, int len) {

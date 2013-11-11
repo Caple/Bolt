@@ -12,7 +12,6 @@ import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
-import pw.caple.bolt.api.Protocol;
 import pw.caple.bolt.applications.ApplicationManager;
 import com.orientechnologies.orient.object.db.OObjectDatabasePool;
 import com.orientechnologies.orient.object.db.OObjectDatabaseTx;
@@ -25,18 +24,6 @@ public class Bolt {
 	private static OServer database;
 	private static OObjectDatabasePool dbPool;
 	private static ApplicationManager appManager;
-
-	private final static String serverPath = new File(Bolt.class.getProtectionDomain().getCodeSource().getLocation().getPath()).toString();
-
-	@Protocol
-	private static void stop() {
-		new Thread(new Runnable() {
-			@Override
-			public void run() {
-				shutdown();
-			}
-		}).start();
-	}
 
 	public static void shutdown() {
 		try {
@@ -58,10 +45,6 @@ public class Bolt {
 
 	public static OObjectDatabaseTx aquireDB(String url, String user, String password) {
 		return dbPool.acquire(url, user, password);
-	}
-
-	public static String getServerPath() {
-		return serverPath;
 	}
 
 	public static void main(String[] args) throws Exception {
