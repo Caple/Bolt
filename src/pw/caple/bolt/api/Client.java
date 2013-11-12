@@ -1,9 +1,6 @@
 package pw.caple.bolt.api;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
-import pw.caple.bolt.socket.SocketConnection;
+import pw.caple.bolt.socket.ProtocolIntermediate;
 
 /**
  * Represents a single connection using the Bolt protocol. An application can
@@ -12,26 +9,27 @@ import pw.caple.bolt.socket.SocketConnection;
  */
 public abstract class Client {
 
-	private SocketConnection socket;
+	private final static int DEFAULT_TIMEOUT = 10000;
+	private ProtocolIntermediate protocol;
 
-	private final AtomicLong callbackID = new AtomicLong();
-	private final Map<Long, Callback> callbacks = new ConcurrentHashMap<>();
-
-	/**
-	 * Sends a protocol message to the client.
-	 */
-	public final void send(String message) {
-		socket.send(message);
+	public final void setIntermediate(ProtocolIntermediate protocol) {
+		this.protocol = protocol;
 	}
 
 	/**
-	 * Sends a protocol message to the client and synchronously waits for the
-	 * client to return a result.
+	 * Calls a protocol method on the client and waits for the result.
+	 * 
+	 * @return
 	 */
-	public final void send(String message, Callback callback) {
-		long cbid = callbackID.incrementAndGet();
-		callbacks.put(cbid, callback);
-		socket.send("cbAsk " + callbackID + " " + message);
+	public final String call(String method, Object... args) {
+		return protocol.sendBlockingMessage(DEFAULT_TIMEOUT, method, args);
+	}
+
+	/**
+	 * Calls a protocol method on the client asynchronously.
+	 */
+	public final void callAsync(String method, Object... args) {
+		protocol.sendAsynchronousMessage(method, args);
 	}
 
 	/**
@@ -43,23 +41,5 @@ public abstract class Client {
 	 * Called after the client disconnects.
 	 */
 	public abstract void onClose();
-
-	public final void serverCallback(int cbid, String result) {
-		if (!callbacks.containsKey(cbid)) return;
-		Callback callback = callbacks.get(cbid);
-		callbacks.remove(cbid);
-		callback.run(result);
-	}
-
-	public final void setSocket(SocketConnection socket) {
-		this.socket = socket;
-	}
-
-	/**
-	 * Simple runnable with an argument
-	 */
-	public static interface Callback {
-		public void run(String result);
-	}
 
 }

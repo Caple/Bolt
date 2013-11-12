@@ -2,7 +2,6 @@ package pw.caple.bolt.api;
 
 import pw.caple.bolt.Bolt;
 import pw.caple.bolt.socket.GenericClient;
-import pw.caple.bolt.socket.SocketConnection;
 import com.orientechnologies.orient.object.db.OObjectDatabaseTx;
 
 /**
@@ -19,12 +18,6 @@ public abstract class Application {
 		this.name = name;
 	}
 
-	public final Client initializeConnection(SocketConnection socket) {
-		Client client = getNewClient();
-		client.setSocket(socket);
-		return client;
-	};
-
 	/**
 	 * The name of the application as determined by it's path.
 	 */
@@ -36,7 +29,7 @@ public abstract class Application {
 	 * An application may override this method in order to create a custom
 	 * client with any extra connection-bound data that it may need.
 	 */
-	protected Client getNewClient() {
+	public Client getNewClient() {
 		return new GenericClient();
 	}
 

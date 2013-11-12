@@ -9,22 +9,17 @@ import java.net.URLClassLoader;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import pw.caple.bolt.api.Client;
 import pw.caple.bolt.api.Protocol;
 
 public class ProtocolEngine {
 
 	//TODO: search jars and other places than just bin
-
-	private final static Pattern regex = Pattern.compile("[^\\s\"']+|\"([^\"]*)\"|'([^']*)'");
 
 	private final Map<String, List<Method>> methods = new ConcurrentHashMap<>();
 	private final ReservedProtocol reservedProtocol;
@@ -65,32 +60,16 @@ public class ProtocolEngine {
 
 	}
 
-	public Object processMessage(Client client, String message) {
-		List<String> matches = new ArrayList<String>();
-		Matcher regexMatcher = regex.matcher(message);
-		while (regexMatcher.find()) {
-			if (regexMatcher.group(1) != null) {
-				matches.add(regexMatcher.group(1));
-			} else if (regexMatcher.group(2) != null) {
-				matches.add(regexMatcher.group(2));
-			} else {
-				matches.add(regexMatcher.group());
-			}
-		}
-		if (matches.size() > 0) {
-			String methodName = matches.get(0);
-			matches.remove(0);
-			String[] args = matches.toArray(new String[matches.size()]);
-			if (methods.containsKey(methodName)) {
-				for (Method method : methods.get(methodName)) {
-					if (isTarget(method, args)) {
-						return call(client, method, args);
-					}
+	public Object runCommand(Client client, String command, String[] args) {
+		if (methods.containsKey(command)) {
+			for (Method method : methods.get(command)) {
+				if (isTarget(method, args)) {
+					return call(client, method, args);
 				}
-				client.send("error \"" + methodName + ": wrong number of parameters\"");
-			} else {
-				client.send("error \"" + methodName + ": unknown command\"");
 			}
+			client.call("error", command + ": wrong number of parameters");
+		} else {
+			client.call("error", command + ": unknown command");
 		}
 		return null;
 	}
@@ -137,8 +116,8 @@ public class ProtocolEngine {
 				if (object != null) {
 					args[i] = object;
 				} else {
-					client.send("error \"" + method.getName() + ": syntax incorrect; expected "
-							+ params[i].getSimpleName() + " for parameter " + (i - offset + 1) + "\"");
+					client.call("error", method.getName() + ": syntax incorrect; expected "
+							+ params[i].getSimpleName() + " for parameter " + (i - offset + 1));
 					return null;
 				}
 			}

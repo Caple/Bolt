@@ -17,10 +17,11 @@ public class SocketConnection implements WebSocketListener {
 
 	private final Application application;
 	private final ProtocolEngine protocolEngine;
+	private ProtocolIntermediate protocolIntermediate;
 
-	SocketConnection(Application application, ProtocolEngine protocolScanner) {
+	SocketConnection(Application application, ProtocolEngine protocolEngine) {
 		this.application = application;
-		protocolEngine = protocolScanner;
+		this.protocolEngine = protocolEngine;
 	}
 
 	public final void send(String message) {
@@ -32,6 +33,9 @@ public class SocketConnection implements WebSocketListener {
 	}
 
 	public final void close(int code, String reason) {
+		if (protocolIntermediate != null) {
+			protocolIntermediate.close();
+		}
 		if (client != null) {
 			client.onClose();
 		}
@@ -51,15 +55,18 @@ public class SocketConnection implements WebSocketListener {
 
 	@Override
 	public void onWebSocketClose(int statusCode, String reason) {
-		if (client != null) client.onClose();
+		close(0, "closing");
 	}
 
 	@Override
 	public void onWebSocketConnect(Session session) {
 		this.session = session;
 		remote = session.getRemote();
-		client = application.initializeConnection(this);
+		client = application.getNewClient();
+		protocolIntermediate = new ProtocolIntermediate(remote, client, protocolEngine);
+		client.setIntermediate(protocolIntermediate);
 		client.onOpen();
+
 		if (!session.isSecure()) {
 			try {
 				session.close(1002, "only accepting secured connections");
@@ -84,7 +91,7 @@ public class SocketConnection implements WebSocketListener {
 
 	@Override
 	public void onWebSocketText(String message) {
-		protocolEngine.processMessage(client, message);
+		protocolIntermediate.processIncoming(message);
 	}
 
 }

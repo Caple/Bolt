@@ -12,24 +12,16 @@ public class ReservedProtocol {
 	}
 
 	public void PING(Client client) {
-		client.send("PONG");
+		client.call("PONG");
 	}
 
 	public void cbAsk(Client client, int cbid, String message) {
-		Object result = protocolEngine.processMessage(client, message);
-		if (result != null) {
-			client.send("cbResult " + cbid + " " + result.toString());
-		} else {
-			client.send("cbResult " + cbid);
-		}
-	}
-
-	public void cbResult(Client client, int cbid) {
-		cbResult(client, cbid, null);
-	}
-
-	public void cbResult(Client client, int cbid, String result) {
-		client.serverCallback(cbid, result);
+		//		Object result = protocolEngine.process(client, message);
+		//		if (result != null) {
+		//			client.call("cbResult", cbid, result.toString());
+		//		} else {
+		//			client.call("cbResult", cbid);
+		//		}
 	}
 
 	public void stop() {
