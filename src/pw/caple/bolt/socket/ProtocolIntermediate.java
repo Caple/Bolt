@@ -2,11 +2,16 @@ package pw.caple.bolt.socket;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedTransferQueue;
+import java.util.concurrent.atomic.AtomicLong;
 import org.eclipse.jetty.websocket.api.RemoteEndpoint;
+import pw.caple.bolt.api.Callback;
 import pw.caple.bolt.api.Client;
 import pw.caple.bolt.applications.ProtocolEngine;
+import pw.caple.bolt.socket.ProtocolMessage.Mode;
 
 /**
  * Stands between the socket connection code and the application. Allows for
@@ -14,89 +19,105 @@ import pw.caple.bolt.applications.ProtocolEngine;
  */
 public class ProtocolIntermediate implements Closeable {
 
-	private final static String MODE_BLOCKING = "BLOCK";
-	private final static String MODE_ASYNCHRONOUS = "ASYNC";
-
-	private final static String DIE_MESSAGE = "THREAD_DIE";
-	private final static String UNBLOCK_MESSAGE = "ASYNC*UNBLOCK!";
-
+	private final ProtocolEngine engine;
+	private final Client client;
 	private final Thread thread;
 	private final ThreadCode code;
 	private final RemoteEndpoint remote;
-	private final BlockingQueue<String> queue;
-	private volatile String callbackResult;
+	private final BlockingQueue<ProtocolMessage> queue = new LinkedTransferQueue<>();
+
+	private final AtomicLong messageID = new AtomicLong();
+	private final Map<Long, Callback> callbacks = new ConcurrentHashMap<>();
+
+	private final AtomicLong blockedOnMessageID = new AtomicLong(-1);
+	private volatile String blockResult;
 
 	ProtocolIntermediate(RemoteEndpoint remote, Client client, ProtocolEngine engine) {
 		this.remote = remote;
-		code = new ThreadCode(client, engine);
-		queue = new LinkedTransferQueue<String>();
+		this.client = client;
+		this.engine = engine;
+		code = new ThreadCode();
 		thread = new Thread(code);
 		thread.start();
 	}
 
 	public void processIncoming(String message) {
-		if (message.equals(DIE_MESSAGE)) {
-			return; // client shouldn't be sending this...
-		} else if (message.startsWith(UNBLOCK_MESSAGE)) {
-			callbackResult = null;
-			if (message.length() > UNBLOCK_MESSAGE.length()) {
-				callbackResult = message.substring(UNBLOCK_MESSAGE.length());
+		ProtocolMessage msg = new ProtocolMessage(message);
+		switch (msg.getMode()) {
+		case CALL:
+			queue.add(msg);
+			break;
+		case RETURN:
+			String[] args = msg.getArgs();
+			long id = Long.parseLong(args[0]);
+			String result = args.length > 1 ? args[1] : null;
+			if (blockedOnMessageID.get() == id) {
+				blockResult = result;
+				synchronized (thread) {
+					thread.notifyAll();
+				}
+			} else {
+				if (callbacks.containsKey(id)) {
+					Callback callback = callbacks.get(id);
+					callbacks.remove(id);
+					callback.run(result);
+				}
 			}
-			synchronized (thread) {
-				thread.notifyAll();
-			}
-		} else {
-			queue.add(message);
+			break;
+		case DIE:
+			sendAsynchronousCall("error", "die mode is forbidden");
+			return;
 		}
 	}
 
-	public String sendBlockingMessage(int timeout, String method, Object... args) {
+	public String sendBlockingCall(int timeout, String method, Object... args) {
+		String[] stringArgs = new String[args.length + 1];
+		stringArgs[0] = method;
+		for (int i = 0; i < args.length; i++) {
+			stringArgs[i + 1] = args[i].toString();
+		}
+		long id = messageID.incrementAndGet();
+		blockedOnMessageID.set(id);
+		ProtocolMessage message = new ProtocolMessage(id, Mode.CALL, stringArgs);
 		try {
-			String header = buildHeader(MODE_BLOCKING, method);
-			String message = buildMessage(header, args);
 			try {
-				remote.sendString(message);
+				remote.sendString(message.toString());
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 			synchronized (thread) {
 				thread.wait(timeout);
 			}
-			return callbackResult;
+			return blockResult;
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 			return null;
 		}
 	}
 
-	public void sendAsynchronousMessage(String method, Object... args) {
-		String header = buildHeader(MODE_ASYNCHRONOUS, method);
-		String message = buildMessage(header, args);
-		remote.sendStringByFuture(message);
-	}
-
-	private String buildHeader(String mode, String method) {
-		final StringBuilder builder = new StringBuilder(mode);
-		builder.append('*');
-		builder.append(method);
-		builder.append('!');
-		return builder.toString();
-	}
-
-	private String buildMessage(String header, Object[] args) {
-		final StringBuilder builder = new StringBuilder(header);
-		for (Object arg : args) {
-			builder.append(arg.toString().replace("*", "&#42;"));
-			builder.append('*');
+	public void sendAsynchronousCall(String method, Object... args) {
+		String[] stringArgs = new String[args.length + 1];
+		stringArgs[0] = method;
+		Callback callback = null;
+		for (int i = 0; i < args.length; i++) {
+			if (args[i] instanceof Callback) {
+				callback = (Callback) args[i];
+			} else {
+				stringArgs[i + 1] = args[i].toString();
+			}
 		}
-		if (args.length > 0) builder.setLength(builder.length() - 1);
-		return builder.toString();
+		long id = messageID.incrementAndGet();
+		ProtocolMessage message = new ProtocolMessage(id, Mode.CALL, stringArgs);
+		if (callback != null) {
+			callbacks.put(id, callback);
+		}
+		remote.sendStringByFuture(message.toString());
 	}
 
 	@Override
 	public void close() {
 		try {
-			queue.add(DIE_MESSAGE);
+			queue.add(ProtocolMessage.getPoison());
 			thread.join();
 		} catch (InterruptedException e) {
 			e.printStackTrace();
@@ -105,46 +126,35 @@ public class ProtocolIntermediate implements Closeable {
 
 	private class ThreadCode extends Thread {
 
-		private final ProtocolEngine engine;
-		private final Client client;
-
-		ThreadCode(Client client, ProtocolEngine engine) {
-			this.client = client;
-			this.engine = engine;
-		}
-
 		@Override
 		public void run() {
 			boolean running = true;
 			try {
 				while (running) {
-					String message = queue.take();
-					if (message.equals(DIE_MESSAGE)) {
+					ProtocolMessage message = queue.take();
+					if (message.getMode() == ProtocolMessage.Mode.DIE) {
 						running = false;
-					} else {
-						process(message);
+						break;
 					}
+					String[] args = message.getArgs();
+					String functionName = args[0];
+					String[] functionArgs = new String[args.length - 1];
+					System.arraycopy(args, 1, functionArgs, 0, args.length - 1);
+					Object result = engine.callMethod(functionName, functionArgs, client);
+
+					// send callback
+					long id = messageID.incrementAndGet();
+					String[] returnArray;
+					if (result != null) {
+						returnArray = new String[] { Long.toString(message.getId()), result.toString() };
+					} else {
+						returnArray = new String[] { Long.toString(message.getId()) };
+					}
+					ProtocolMessage returnMessage = new ProtocolMessage(id, Mode.RETURN, returnArray);
+					remote.sendStringByFuture(returnMessage.toString());
 				}
 			} catch (InterruptedException e) {
 				return;
-			}
-		}
-
-		private void process(String message) {
-			int headerLength = message.indexOf("!");
-			String[] header = message.substring(0, headerLength).split("\\*");
-
-			String mode = header[0];
-			String command = header[1];
-			String[] args = new String[0];
-
-			if (message.length() > headerLength + 1) {
-				args = message.substring(headerLength + 1).split("\\*");
-			}
-
-			Object result = engine.runCommand(client, command, args);
-			if (mode == MODE_BLOCKING) {
-				//TODO: client blocking
 			}
 		}
 

@@ -64,7 +64,7 @@ public class Update {
 		try {
 			switch (update.fetchUpdate()) {
 			case Success:
-				client.call("log", "update running");
+				client.send("log", "update running");
 				new Thread(new Runnable() {
 					@Override
 					public void run() {

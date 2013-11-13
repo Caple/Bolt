@@ -9,6 +9,9 @@ import pw.caple.bolt.socket.ProtocolIntermediate;
  */
 public abstract class Client {
 
+	/**
+	 * Maximum time in milliseconds to wait for a result.
+	 */
 	private final static int DEFAULT_TIMEOUT = 10000;
 	private ProtocolIntermediate protocol;
 
@@ -17,19 +20,32 @@ public abstract class Client {
 	}
 
 	/**
-	 * Calls a protocol method on the client and waits for the result.
+	 * In most situations you should use {@link Client#send} instead. This
+	 * function calls a protocol method on the client and blocks until it
+	 * receives a result. If the call to the client takes longer than the time
+	 * specified by {@link Client#DEFAULT_TIMEOUT} to complete, then the thread
+	 * resumes and <code>null</code> is returned instead.
 	 * 
-	 * @return
+	 * @param method
+	 *            the client function to call (<code>case-sensitive</code>)
+	 * @param args
+	 *            arguments to send
+	 * @return The result of the call or <code>null</code> if no result.
 	 */
 	public final String call(String method, Object... args) {
-		return protocol.sendBlockingMessage(DEFAULT_TIMEOUT, method, args);
+		return protocol.sendBlockingCall(DEFAULT_TIMEOUT, method, args);
 	}
 
 	/**
-	 * Calls a protocol method on the client asynchronously.
+	 * Runs a method on the client asynchronously.
+	 * 
+	 * @param method
+	 *            the client function to call (<code>case-sensitive</code>)
+	 * @param args
+	 *            arguments to send; may also include a {@link Callback}
 	 */
-	public final void callAsync(String method, Object... args) {
-		protocol.sendAsynchronousMessage(method, args);
+	public final void send(String method, Object... args) {
+		protocol.sendAsynchronousCall(method, args);
 	}
 
 	/**

@@ -60,16 +60,16 @@ public class ProtocolEngine {
 
 	}
 
-	public Object runCommand(Client client, String command, String[] args) {
-		if (methods.containsKey(command)) {
-			for (Method method : methods.get(command)) {
+	public Object callMethod(String methodName, String[] args, Client client) {
+		if (methods.containsKey(methodName)) {
+			for (Method method : methods.get(methodName)) {
 				if (isTarget(method, args)) {
 					return call(client, method, args);
 				}
 			}
-			client.call("error", command + ": wrong number of parameters");
+			client.send("error", methodName + ": wrong number of parameters");
 		} else {
-			client.call("error", command + ": unknown command");
+			client.send("error", methodName + ": unknown command");
 		}
 		return null;
 	}
@@ -116,7 +116,7 @@ public class ProtocolEngine {
 				if (object != null) {
 					args[i] = object;
 				} else {
-					client.call("error", method.getName() + ": syntax incorrect; expected "
+					client.send("error", method.getName() + ": syntax incorrect; expected "
 							+ params[i].getSimpleName() + " for parameter " + (i - offset + 1));
 					return null;
 				}
