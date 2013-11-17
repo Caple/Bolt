@@ -12,14 +12,13 @@
 		<path id="classpath">
 			<fileset dir="lib">
 				<include name="**/*.jar" />
-				<exclude name="**/*javadoc*.jar" />
 			</fileset>
 		</path>
 		<javac srcdir="src" destdir="dist/bin" classpathref="classpath" includeantruntime="false" debug="true" />
+		<javadoc sourcepath="src" destdir="dist/jdoc" classpathref="classpath" />
 		<jar jarfile="dist/dependencies.jar">
 			<zipgroupfileset dir="lib/">
 				<include name="**/*.jar" />
-				<exclude name="**/*javadoc*.jar" />
 			</zipgroupfileset>
 		</jar>
 		<jar jarfile="dist/Bolt-${version}.jar">
@@ -33,12 +32,14 @@
 			</fileset>
 			<fileset dir="res" />
 			<fileset dir="dist/bin" />
+			<fileset dir="dist/jdoc" />
 			<zipfileset src="dist/dependencies.jar">
 				<exclude name="META-INF/**" />
 			</zipfileset>
 		</jar>
 		<delete file="dist/dependencies.jar" />
 		<delete dir="dist/bin" />
+		<delete dir="dist/jdoc" />
 	</target>
 
 	<target name="clean">

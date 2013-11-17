@@ -200,6 +200,18 @@ public class ApplicationInstance {
 			SslContextFactory factory = new SslContextFactory();
 			File keystoreFile = new File(root, ssl.keystore);
 			File passwordFile = new File(root, ssl.password);
+			if (!keystoreFile.exists()) {
+				Log.getLogger(ApplicationInstance.class).warn("=======================================");
+				Log.getLogger(ApplicationInstance.class).warn("SSL certificate error. Could not find keystore " + keystoreFile.toString() + ".");
+				Log.getLogger(ApplicationInstance.class).warn("=======================================");
+				break;
+			}
+			if (!passwordFile.exists()) {
+				Log.getLogger(ApplicationInstance.class).warn("=======================================");
+				Log.getLogger(ApplicationInstance.class).warn("SSL certificate error. Could not find password file " + passwordFile.toString() + ".");
+				Log.getLogger(ApplicationInstance.class).warn("=======================================");
+				break;
+			}
 			String password = null;
 			try {
 				byte[] bytes = Files.readAllBytes(passwordFile.toPath());

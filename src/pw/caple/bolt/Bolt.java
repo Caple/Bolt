@@ -5,14 +5,16 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import javax.tools.ToolProvider;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
+import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.server.handler.ResourceHandler;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import pw.caple.bolt.applications.ApplicationManager;
 import com.orientechnologies.orient.object.db.OObjectDatabasePool;
@@ -51,13 +53,6 @@ public class Bolt {
 
 	public static void main(String[] args) throws Exception {
 
-		// Check of Java compiler is available
-		if (ToolProvider.getSystemJavaCompiler() == null) {
-			System.err.println("CRITICAL ERROR: Java compiler is inaccessible!");
-			System.err.println("Please ensure JAVA_HOME refers to the JDK instead of the JRE. -- Exiting.");
-			return;
-		}
-
 		String oServerConfig = "" +
 				"<?xml version='1.0' encoding='UTF-8' standalone='yes'?>" +
 				"<orient-server>" +
@@ -87,23 +82,41 @@ public class Bolt {
 		threadPool.setIdleTimeout(5000);
 		threadPool.setStopTimeout(1);
 
-		// Handle HTTP connections
+		// Configure connectors
 		HttpConfiguration httpConfig = new HttpConfiguration();
 		httpConfig.setSecureScheme("https");
 		httpConfig.setSecurePort(443);
 		httpConfig.setOutputBufferSize(32768);
 
+		// Allow HTTP connections
 		ServerConnector http = new ServerConnector(webServer, new HttpConnectionFactory(httpConfig));
 		http.setPort(80);
 		http.setIdleTimeout(30000);
 		http.setReuseAddress(false);
+		webServer.addConnector(http);
+
+		// Allow localhost HTTPS connections
+		writeResourceToDisk("dev.localhost.cert");
+		SslContextFactory factory = new SslContextFactory();
+		factory.setKeyStorePath("resources/dev.localhost.cert");
+		factory.setKeyStorePassword("boltdev");
+		factory.setKeyManagerPassword("boltdev");
+		httpConfig.addCustomizer(new SecureRequestCustomizer());
+		ServerConnector https = new ServerConnector(webServer,
+				new SslConnectionFactory(factory, "http/1.1"),
+				new HttpConnectionFactory(httpConfig));
+		https.setPort(443);
+		https.setIdleTimeout(500000);
+		https.setHost("localhost");
+		webServer.addConnector(https);
 
 		HandlerCollection serverHandler = new HandlerCollection(true);
-		webServer.addConnector(http);
 		webServer.setHandler(serverHandler);
 
-		addResource(serverHandler, "bolt.js", "/bolt");
-		addResource(serverHandler, "console.html", "/bolt/console");
+		writeResourceToDisk("bolt.js");
+		writeResourceToDisk("console.html");
+		addResourceHandler(serverHandler, "bolt.js", "/bolt");
+		addResourceHandler(serverHandler, "console.html", "/bolt/console");
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			@Override
@@ -119,10 +132,9 @@ public class Bolt {
 		shutdown();
 	}
 
-	private static void addResource(HandlerCollection handler, String resource, String url) {
+	private static void writeResourceToDisk(String resource) {
 		File resourcesFolder = new File("resources/");
 		resourcesFolder.mkdir();
-		File resourceFile = new File(resourcesFolder, resource);
 		try (
 			InputStream in = Bolt.class.getClassLoader().getResourceAsStream(resource);
 			OutputStream out = new FileOutputStream(new File(resourcesFolder, resource));
@@ -133,15 +145,20 @@ public class Bolt {
 			while ((bytes = in.read(buffer)) >= 0) {
 				out.write(buffer, 0, bytes);
 			}
-			ResourceHandler scriptResource = new ResourceHandler();
-			scriptResource.setResourceBase(resourceFile.toString());
-			ContextHandler context = new ContextHandler();
-			context.setContextPath(url);
-			context.setHandler(scriptResource);
-			handler.addHandler(context);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+
+	private static void addResourceHandler(HandlerCollection handler, String resource, String url) {
+		File resourcesFolder = new File("resources/");
+		File resourceFile = new File(resourcesFolder, resource);
+		ResourceHandler scriptResource = new ResourceHandler();
+		scriptResource.setResourceBase(resourceFile.toString());
+		ContextHandler context = new ContextHandler();
+		context.setContextPath(url);
+		context.setHandler(scriptResource);
+		handler.addHandler(context);
 	}
 
 }
