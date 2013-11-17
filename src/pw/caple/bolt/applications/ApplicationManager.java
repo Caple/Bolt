@@ -20,15 +20,12 @@ import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jgit.api.CloneCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.FetchResult;
-import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import pw.caple.bolt.applications.ApplicationInstance.AppLoadException;
 
 public class ApplicationManager {
@@ -71,48 +68,62 @@ public class ApplicationManager {
 				e.printStackTrace();
 			}
 		}
+		if (new File("bolt.xml").exists()) {
+			// load application in server root.
+			// this logic exists to allow easy debugging of new projects
+			try {
+				File root = new File(".").getCanonicalFile();
+				ApplicationInstance app = new ApplicationInstance(webServer, root);
+				try {
+					app.load();
+					apps.put(root.getName(), app);
+				} catch (AppLoadException e) {
+					app.shutdown();
+					e.printStackTrace();
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 
 	private void importFromGit(URL url, String branch, String username, String password) {
-		try {
-
-			if (branch == null) branch = "master";
-			File tmpFolder = new File("tmp/clone/");
-
-			// download config.xml from specified git repository
-			CloneCommand clone = Git.cloneRepository().setDirectory(tmpFolder).setURI(url.toString()).setBranch(branch);
-			if (username != null && password != null) {
-				CredentialsProvider provider;
-				provider = new UsernamePasswordCredentialsProvider(username, password);
-				clone = clone.setCredentialsProvider(provider);
-			}
-			Git git = clone.setNoCheckout(true).call();
-			git.checkout().addPath("config.xml").call();
-
-			File appXMLFile = new File("tmp/clone/config.xml");
-			ApplicationXML xml = parseXML(appXMLFile);
-			if (xml.name == null) {
-				throw new RuntimeException("Import failed; config.xml was invalid");
-			}
-
-			// clean up
-			appXMLFile.delete();
-			tmpFolder.delete();
-
-			// download the rest of the files from the repository
-			File importFolder = new File("apps/" + xml.name);
-			if (importFolder.exists()) {
-				throw new RuntimeException("Import failed; application with same name already exists.");
-			}
-			importFolder.mkdir();
-			clone = clone.setNoCheckout(false).setDirectory(importFolder);
-			clone.call();
-
-			compileSource(xml.name);
-
-		} catch (GitAPIException e) {
-			throw new RuntimeException("Import failed; Git error: " + e.getMessage());
-		}
+		//		try {
+		//
+		//			if (branch == null) branch = "master";
+		//			File tmpFolder = new File("tmp/clone/");
+		//
+		//			// download config.xml from specified git repository
+		//			CloneCommand clone = Git.cloneRepository().setDirectory(tmpFolder).setURI(url.toString()).setBranch(branch);
+		//			if (username != null && password != null) {
+		//				CredentialsProvider provider;
+		//				provider = new UsernamePasswordCredentialsProvider(username, password);
+		//				clone = clone.setCredentialsProvider(provider);
+		//			}
+		//			Git git = clone.setNoCheckout(true).call();
+		//			git.checkout().addPath("config.xml").call();
+		//
+		//			File appXMLFile = new File("tmp/clone/config.xml");
+		//			ApplicationXML xml = parseXML(appXMLFile);
+		//
+		//			// clean up
+		//			appXMLFile.delete();
+		//			tmpFolder.delete();
+		//
+		//			// download the rest of the files from the repository
+		//			File importFolder = new File("apps/" + xml.name);
+		//			if (importFolder.exists()) {
+		//				throw new RuntimeException("Import failed; application with same name already exists.");
+		//			}
+		//			importFolder.mkdir();
+		//			clone = clone.setNoCheckout(false).setDirectory(importFolder);
+		//			clone.call();
+		//
+		//			compileSource(xml.name);
+		//
+		//		} catch (GitAPIException e) {
+		//			throw new RuntimeException("Import failed; Git error: " + e.getMessage());
+		//		}
 	}
 
 	private void update(String name) {

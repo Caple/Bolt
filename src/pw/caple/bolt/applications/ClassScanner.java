@@ -19,12 +19,12 @@ import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-public class Reflection {
+public class ClassScanner {
 
 	private final URLClassLoader classLoader;
 	private final List<Class<?>> classes;
 
-	public Reflection(URLClassLoader classLoader) {
+	public ClassScanner(URLClassLoader classLoader) {
 		this.classLoader = classLoader;
 		List<Class<?>> classes = new ArrayList<>();
 		for (URL url : classLoader.getURLs()) {
@@ -97,8 +97,8 @@ public class Reflection {
 
 	private List<Class<?>> findJarredClasses(File file) {
 		final List<Class<?>> classes = new ArrayList<>();
-		try {
-			ZipInputStream zip = new ZipInputStream(new FileInputStream(file));
+		try (
+			ZipInputStream zip = new ZipInputStream(new FileInputStream(file))) {
 			for (ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry())
 				if (!entry.isDirectory() && entry.getName().endsWith(".class")) {
 					String name = entry.getName();

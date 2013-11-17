@@ -12,10 +12,11 @@ public abstract class Client {
 	/**
 	 * Maximum time in milliseconds to wait for a result.
 	 */
-	private final static int DEFAULT_TIMEOUT = 10000;
+	private final static int BLOCKING_TIMEOUT = 10000;
 	private ProtocolIntermediate protocol;
+	private Application application;
 
-	public final void setIntermediate(ProtocolIntermediate protocol) {
+	public final void init(Application application, ProtocolIntermediate protocol) {
 		this.protocol = protocol;
 	}
 
@@ -23,7 +24,7 @@ public abstract class Client {
 	 * In most situations you should use {@link Client#send} instead. This
 	 * function calls a protocol method on the client and blocks until it
 	 * receives a result. If the call to the client takes longer than the time
-	 * specified by {@link Client#DEFAULT_TIMEOUT} to complete, then the thread
+	 * specified by {@link Client#BLOCKING_TIMEOUT} to complete, then the thread
 	 * resumes and <code>null</code> is returned instead.
 	 * 
 	 * @param method
@@ -33,7 +34,7 @@ public abstract class Client {
 	 * @return The result of the call or <code>null</code> if no result.
 	 */
 	public final String call(String method, Object... args) {
-		return protocol.sendBlockingCall(DEFAULT_TIMEOUT, method, args);
+		return protocol.sendBlockingCall(BLOCKING_TIMEOUT, method, args);
 	}
 
 	/**
@@ -46,6 +47,15 @@ public abstract class Client {
 	 */
 	public final void send(String method, Object... args) {
 		protocol.sendAsynchronousCall(method, args);
+	}
+
+	/**
+	 * Gets the application this client is connected to.
+	 * 
+	 * @return The application the client belongs to.
+	 */
+	public final Application getApplication() {
+		return application;
 	}
 
 	/**

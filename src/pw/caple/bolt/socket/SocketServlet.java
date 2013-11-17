@@ -11,15 +11,17 @@ public class SocketServlet extends WebSocketServlet {
 
 	private final Application application;
 	private final ProtocolEngine protocolEngine;
+	private final boolean forceWSS;
 
-	public SocketServlet(Application application, ProtocolEngine protocolEngine) {
+	public SocketServlet(Application application, ProtocolEngine protocolEngine, boolean forceWSS) {
 		this.application = application;
 		this.protocolEngine = protocolEngine;
+		this.forceWSS = forceWSS;
 	}
 
 	@Override
 	public void configure(WebSocketServletFactory factory) {
 		factory.getPolicy().setIdleTimeout(120000);
-		factory.setCreator(new SocketCreator(application, protocolEngine));
+		factory.setCreator(new SocketCreator(application, protocolEngine, forceWSS));
 	}
 }

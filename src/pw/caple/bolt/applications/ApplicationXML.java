@@ -1,88 +1,63 @@
 package pw.caple.bolt.applications;
 
+import java.util.ArrayList;
 import java.util.List;
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlElementWrapper;
 import javax.xml.bind.annotation.XmlRootElement;
 
-@XmlRootElement(name = "application")
+@XmlRootElement(name = "config")
 class ApplicationXML {
 
 	@XmlElement
-	String name;
+	List<String> domain = new ArrayList<>();
 
 	@XmlElement
-	String mainClass;
-
-	@XmlElement
-	Git git;
+	List<Content> content = new ArrayList<>();
 
 	@XmlRootElement
-	static class Git {
-		@XmlElement
+	static class Content {
+		@XmlAttribute(required = true)
+		String folder;
+		@XmlAttribute
+		String url = "/";
+		@XmlAttribute
+		boolean secure = false;
+	}
+
+	@XmlElement
+	List<Servlet> servlet = new ArrayList<>();
+
+	@XmlRootElement
+	static class Servlet {
+		@XmlAttribute(required = true)
 		String url;
-		@XmlElement
-		String username;
-		@XmlElement
-		String password;
-	}
-
-	@XmlElementWrapper
-	@XmlElement(name = "address")
-	List<String> bindings;
-
-	@XmlElement
-	Map map;
-
-	@XmlRootElement
-	static class Map {
-
-		@XmlElement
-		List<Content> content;
-		@XmlElement
-		List<Socket> socket;
-		@XmlElement
-		List<Servlet> servlet;
-
-		@XmlRootElement
-		static class Content {
-			@XmlAttribute
-			String folder;
-			@XmlAttribute
-			String url;
-		}
-
-		@XmlRootElement
-		static class Socket {
-			@XmlAttribute
-			String url;
-		}
-
-		@XmlRootElement
-		static class Servlet {
-			@XmlAttribute
-			String className;
-			@XmlAttribute
-			String url;
-		}
+		@XmlAttribute(name = "class", required = true)
+		String className;
+		@XmlAttribute
+		boolean secure = false;
 	}
 
 	@XmlElement
-	Security security;
+	Security security = new Security();
 
 	@XmlRootElement
 	static class Security {
 		@XmlElement
-		Keystore keystore;
-		@XmlElement
-		String pepper;
+		boolean forceWSS = false;
 
-		static class Keystore {
-			@XmlElement
-			String path;
-			@XmlElement
+		@XmlElement
+		List<SSL> ssl = new ArrayList<>();
+
+		static class SSL {
+			@XmlAttribute(required = true)
+			String keystore;
+			@XmlAttribute(required = true)
 			String password;
+			@XmlAttribute
+			String alias;
+			@XmlAttribute
+			String ip;
 		}
 	}
 

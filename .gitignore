@@ -1,4 +1,5 @@
 apps
 bin
-build
 db
+dist
+resources

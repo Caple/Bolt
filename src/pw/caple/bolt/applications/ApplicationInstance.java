@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,16 +18,23 @@ import javax.servlet.Servlet;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
+import org.eclipse.jetty.server.Connector;
+import org.eclipse.jetty.server.HttpConfiguration;
+import org.eclipse.jetty.server.HttpConnectionFactory;
+import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.server.handler.ResourceHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.log.Log;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import pw.caple.bolt.api.Application;
-import pw.caple.bolt.applications.ApplicationXML.Map.Content;
-import pw.caple.bolt.applications.ApplicationXML.Map.Socket;
+import pw.caple.bolt.applications.ApplicationXML.Content;
+import pw.caple.bolt.applications.ApplicationXML.Security.SSL;
 import pw.caple.bolt.socket.SocketServlet;
 
 public class ApplicationInstance {
@@ -33,6 +42,7 @@ public class ApplicationInstance {
 	private final File root;
 	private final String name;
 	private final Server server;
+	private final List<Connector> connectors = new ArrayList<>();
 
 	private ApplicationXML xml;
 	private Application application;
@@ -40,11 +50,8 @@ public class ApplicationInstance {
 	private HandlerCollection handler;
 	private ProtocolEngine protocolEngine;
 
-	//TODO: ssl/tls per app
-	//TODO: update command
-	//TODO: import command
+	//TODO: update/import command + console
 	//TODO: make sure I want to stick with OrientDB
-	//TODO: local net-address binding?
 
 	public static class AppLoadException extends Exception {
 
@@ -96,6 +103,14 @@ public class ApplicationInstance {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		for (Connector connector : connectors) {
+			try {
+				connector.stop();
+				server.removeConnector(connector);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
 		try {
 			if (classLoader != null) {
 				classLoader.close();
@@ -107,9 +122,9 @@ public class ApplicationInstance {
 
 	private void readXMLConfig() throws AppLoadException {
 		try {
-			File appXMLFile = new File(root, "config.xml");
+			File appXMLFile = new File(root, "bolt.xml");
 			if (!appXMLFile.exists()) {
-				Log.getLogger(ApplicationInstance.class).warn("No config.xml found for " + name + System.getProperty("line.separator"));
+				Log.getLogger(ApplicationInstance.class).warn("No bolt.xml found for " + name + System.getProperty("line.separator"));
 				xml = new ApplicationXML();
 				return;
 			}
@@ -117,7 +132,7 @@ public class ApplicationInstance {
 			Unmarshaller jaxbUnmarshaller = jaxbContext.createUnmarshaller();
 			xml = (ApplicationXML) jaxbUnmarshaller.unmarshal(appXMLFile);
 		} catch (JAXBException e) {
-			throw new AppLoadException("malformed config.xml in " + root.toString(), e);
+			throw new AppLoadException("malformed bolt.xml in " + root.toString(), e);
 		}
 	}
 
@@ -158,7 +173,7 @@ public class ApplicationInstance {
 	private void loadJavaApplication() throws AppLoadException {
 		try {
 			if (classLoader.getURLs().length == 0) return;
-			Reflection reflection = new Reflection(classLoader);
+			ClassScanner reflection = new ClassScanner(classLoader);
 			List<Class<?>> classes = reflection.getSubclassesOf(Application.class, classLoader);
 			if (classes.size() < 1) {
 				throw new AppLoadException(name + " does not define an Application class");
@@ -178,37 +193,75 @@ public class ApplicationInstance {
 		HandlerCollection serverHandler = (HandlerCollection) server.getHandler();
 
 		handler = new HandlerCollection();
-		String[] virtualHosts = xml.bindings.toArray(new String[xml.bindings.size()]);
+		String[] virtualHosts = xml.domain.toArray(new String[xml.domain.size()]);
 		String[] indexFiles = new String[] { "index.html", "index.php" };
 
-		if (xml.map.content != null) {
-			for (Content content : xml.map.content) {
-				if (content.folder == null) {
-					throw new AppLoadException("invalid content definition in config.xml of " + name);
-				}
-				File contentDirectory = new File(root, content.folder);
-				if (!contentDirectory.exists()) {
-					throw new AppLoadException("content folder missing for" + name);
-				}
-				ResourceHandler resource = new ResourceHandler();
-				resource.setWelcomeFiles(indexFiles);
-				resource.setResourceBase(new File(root, content.folder).toString());
-				ContextHandler context = new ContextHandler();
-				context.setClassLoader(classLoader);
-				if (virtualHosts.length > 0) context.setVirtualHosts(virtualHosts);
-				if (content.url != null) context.setContextPath(content.url);
-				context.setHandler(resource);
-				handler.addHandler(context);
+		for (SSL ssl : xml.security.ssl) {
+			SslContextFactory factory = new SslContextFactory();
+			File keystoreFile = new File(root, ssl.keystore);
+			File passwordFile = new File(root, ssl.password);
+			String password = null;
+			try {
+				byte[] bytes = Files.readAllBytes(passwordFile.toPath());
+				ByteBuffer buffer = ByteBuffer.wrap(bytes);
+				password = Charset.defaultCharset().decode(buffer).toString();
+			} catch (IOException e) {
+				e.printStackTrace();
+				return;
+			}
+			factory.setKeyStorePath(keystoreFile.toString());
+			factory.setKeyStorePassword(password);
+			factory.setKeyManagerPassword(password);
+			if (ssl.alias != null) factory.setCertAlias(ssl.alias);
+
+			HttpConfiguration config = new HttpConfiguration();
+			config.setSecureScheme("https");
+			config.setSecurePort(443);
+			config.setOutputBufferSize(32768);
+			config.addCustomizer(new SecureRequestCustomizer());
+			ServerConnector https = new ServerConnector(server,
+					new SslConnectionFactory(factory, "http/1.1"),
+					new HttpConnectionFactory(config));
+			https.setPort(443);
+			https.setIdleTimeout(500000);
+			if (ssl.ip != null) {
+				https.setHost(ssl.ip);
+			}
+			server.addConnector(https);
+			connectors.add(https);
+			try {
+				https.start();
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
 		}
 
-		if (xml.map.servlet != null) {
+		for (Content content : xml.content) {
+			if (content.folder == null) {
+				throw new AppLoadException("invalid content definition in bolt.xml of " + name);
+			}
+			File contentDirectory = new File(root, content.folder);
+			if (!contentDirectory.exists()) {
+				throw new AppLoadException("content folder missing for" + name);
+			}
+			ResourceHandler resource = new ResourceHandler();
+			resource.setWelcomeFiles(indexFiles);
+			resource.setResourceBase(new File(root, content.folder).toString());
+			ContextHandler context = new ContextHandler();
+			context.setClassLoader(classLoader);
+			if (virtualHosts.length > 0) context.setVirtualHosts(virtualHosts);
+			if (content.url != null) context.setContextPath(content.url);
+			context.setHandler(resource);
+			handler.addHandler(context);
+		}
+
+		if (xml.servlet.size() > 0) {
 			ServletContextHandler servlets = new ServletContextHandler();
 			servlets.setClassLoader(classLoader);
 			if (virtualHosts.length > 0) servlets.setVirtualHosts(virtualHosts);
-			for (ApplicationXML.Map.Servlet servletInfo : xml.map.servlet) {
+			for (ApplicationXML.Servlet servletInfo : xml.servlet) {
 				if (servletInfo.className == null || servletInfo.url == null) {
-					throw new AppLoadException("invalid servlet definition in config.xml of " + name);
+					throw new AppLoadException("invalid servlet definition in bolt.xml of " + name);
 				}
 				try {
 					Class<?> clazz = classLoader.loadClass(servletInfo.className);
@@ -223,19 +276,12 @@ public class ApplicationInstance {
 			handler.addHandler(servlets);
 		}
 
-		if (xml.map.socket != null) {
-			ServletContextHandler sockets = new ServletContextHandler();
-			sockets.setClassLoader(classLoader);
-			if (virtualHosts.length > 0) sockets.setVirtualHosts(virtualHosts);
-			for (Socket socketInfo : xml.map.socket) {
-				if (socketInfo.url == null) {
-					throw new AppLoadException("invalid socket definition in config.xml of " + name);
-				}
-				ServletHolder holder = new ServletHolder(new SocketServlet(application, protocolEngine));
-				sockets.addServlet(holder, socketInfo.url);
-			}
-			handler.addHandler(sockets);
-		}
+		ServletContextHandler socket = new ServletContextHandler();
+		socket.setClassLoader(classLoader);
+		if (virtualHosts.length > 0) socket.setVirtualHosts(virtualHosts);
+		ServletHolder holder = new ServletHolder(new SocketServlet(application, protocolEngine, xml.security.forceWSS));
+		socket.addServlet(holder, "/bolt/socket");
+		handler.addHandler(socket);
 
 		serverHandler.addHandler(handler);
 	}

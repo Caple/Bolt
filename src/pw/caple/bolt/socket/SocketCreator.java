@@ -10,8 +10,8 @@ public class SocketCreator implements WebSocketCreator {
 
 	private final SocketConnection socket;
 
-	SocketCreator(Application application, ProtocolEngine protocolEngine) {
-		socket = new SocketConnection(application, protocolEngine);
+	SocketCreator(Application application, ProtocolEngine protocolEngine, boolean forceWSS) {
+		socket = new SocketConnection(application, protocolEngine, forceWSS);
 	}
 
 	@Override

@@ -7,46 +7,45 @@
 	<property name="version" value="1.0-SNAPSHOT" />
 
 	<target name="run" depends="clean">
-		<mkdir dir="build/" />
-		<mkdir dir="build/bin" />
-		<mkdir dir="build/lib" />
-		<mkdir dir="build/doc" />
-		<mkdir dir="build/jar" />
+		<mkdir dir="dist/" />
+		<mkdir dir="dist/bin" />
 		<path id="classpath">
 			<fileset dir="lib">
 				<include name="**/*.jar" />
 				<exclude name="**/*javadoc*.jar" />
 			</fileset>
 		</path>
-		<javac srcdir="src" destdir="build/bin" classpathref="classpath" />
-		<unzip dest="build/lib">
-			<fileset dir="lib">
+		<javac srcdir="src" destdir="dist/bin" classpathref="classpath" includeantruntime="false" debug="true" />
+		<jar jarfile="dist/dependencies.jar">
+			<zipgroupfileset dir="lib/">
 				<include name="**/*.jar" />
 				<exclude name="**/*javadoc*.jar" />
-			</fileset>
-			<patternset>
-				<include name="**/*.class" />
-			</patternset>
-		</unzip>
-		<copy todir="build/doc">
-			<fileset dir=".">
-				<include name="README.md" />
-				<include name="NOTICE.md" />
-				<include name="LICENSE.md" />
-			</fileset>
-		</copy>
-		<jar jarfile="build/jar/Bolt-${version}.jar" manifest="MANIFEST.MF">
-			<fileset dir="build/bin" />
-			<fileset dir="build/lib" />
+			</zipgroupfileset>
 		</jar>
-		<zip destfile="build/Bolt-${DSTAMP}.zip">
-			<fileset dir="build/doc" />
-			<fileset dir="build/jar/" />
-		</zip>
+		<jar jarfile="dist/Bolt-${version}.jar">
+			<manifest>
+				<attribute name="Main-Class" value="pw.caple.bolt.Bolt" />
+			</manifest>
+			<fileset dir=".">
+				<include name="README*" />
+				<include name="NOTICE*" />
+				<include name="LICENSE*" />
+			</fileset>
+			<fileset dir="res" />
+			<fileset dir="dist/bin" />
+			<zipfileset src="dist/dependencies.jar">
+				<exclude name="META-INF/**" />
+			</zipfileset>
+		</jar>
+		<delete file="dist/dependencies.jar" />
+		<delete dir="dist/bin" />
 	</target>
 
 	<target name="clean">
-		<delete dir="build" />
+		<mkdir dir="dist/" />
+		<delete includeEmptyDirs="true">
+			<fileset dir="dist" includes="**/*" />
+		</delete>
 	</target>
 
 </project>

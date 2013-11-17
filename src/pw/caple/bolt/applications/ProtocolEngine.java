@@ -32,7 +32,7 @@ public class ProtocolEngine {
 	}
 
 	private void loadProtocolMethods() {
-		Reflection reflection = new Reflection(classLoader);
+		ClassScanner reflection = new ClassScanner(classLoader);
 		for (Method method : reflection.getAnnotatedMethods(Protocol.class)) {
 			if (Modifier.isStatic(method.getModifiers())) {
 				if (!method.isAccessible()) {

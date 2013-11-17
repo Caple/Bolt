@@ -9,6 +9,7 @@ public class ProtocolMessage {
 	enum Mode {
 		CALL, // make a remote function call
 		RETURN, // return the result of a remote call
+		READY, // socket ready to send/receive
 		DIE; // poison the message queue and kill the connection
 	}
 

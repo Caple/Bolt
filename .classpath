@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="src" path="res"/>
 	<classpathentry kind="lib" path="lib/javax.servlet-3.0.0.v201112011016.jar"/>
 	<classpathentry kind="lib" path="lib/jetty-all-9.0.6.v20130930.jar">
 		<attributes>

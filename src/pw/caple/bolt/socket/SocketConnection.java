@@ -19,14 +19,16 @@ public class SocketConnection implements WebSocketListener {
 	private Session session;
 	private RemoteEndpoint remote;
 
+	private final boolean forceWSS;
 	private final Application application;
 	private final ProtocolEngine protocolEngine;
 	private ProtocolIntermediate protocolIntermediate;
 	private ScheduledThreadPoolExecutor pingExecutor;
 
-	SocketConnection(Application application, ProtocolEngine protocolEngine) {
+	SocketConnection(Application application, ProtocolEngine protocolEngine, boolean forceWSS) {
 		this.application = application;
 		this.protocolEngine = protocolEngine;
+		this.forceWSS = forceWSS;
 	}
 
 	public final void close(int code, String reason) {
@@ -55,38 +57,44 @@ public class SocketConnection implements WebSocketListener {
 
 	@Override
 	public void onWebSocketBinary(byte[] payload, int offset, int len) {
-		String a = "";
+
 	}
 
 	@Override
 	public void onWebSocketConnect(Session session) {
 		this.session = session;
-		remote = session.getRemote();
-		client = application.getNewClient();
-		pingExecutor = new ScheduledThreadPoolExecutor(1);
-		pingExecutor.scheduleAtFixedRate(new PingTask(remote), 0, 60, TimeUnit.SECONDS);
-		protocolIntermediate = new ProtocolIntermediate(remote, client, protocolEngine);
-		client.setIntermediate(protocolIntermediate);
-		client.onOpen();
-		if (!session.isSecure()) {
+		if (forceWSS && !session.isSecure()) {
 			try {
-				session.close(1002, "only accepting secured connections");
+				session.close(4040, "only accepting secured connections");
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
+		} else {
+			remote = session.getRemote();
+			client = application.getNewClient();
+			pingExecutor = new ScheduledThreadPoolExecutor(1);
+			pingExecutor.scheduleAtFixedRate(new PingTask(remote), 0, 60, TimeUnit.SECONDS);
+			protocolIntermediate = new ProtocolIntermediate(remote, client, protocolEngine);
+			try {
+				remote.sendString("0*READY!");
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			client.init(application, protocolIntermediate);
+			client.onOpen();
 		}
 	}
 
 	@Override
 	public void onWebSocketClose(int statusCode, String reason) {
-		close(0, "closing");
+		close(1000, "closing");
 	}
 
 	@Override
 	public void onWebSocketError(Throwable cause) {
 		if (cause instanceof WebSocketTimeoutException) {
 			try {
-				session.close(1001, "client timed out");
+				session.close(1002, "client timed out");
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
