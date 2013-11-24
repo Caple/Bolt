@@ -16,9 +16,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Unmarshaller;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
@@ -207,16 +204,6 @@ public class ApplicationManager {
 	}
 
 	// START HELPER METHODS
-
-	private ApplicationXML parseXML(File file) {
-		try {
-			JAXBContext jaxbContext = JAXBContext.newInstance(ApplicationXML.class);
-			Unmarshaller jaxbUnmarshaller = jaxbContext.createUnmarshaller();
-			return (ApplicationXML) jaxbUnmarshaller.unmarshal(file);
-		} catch (JAXBException e) {
-			throw new RuntimeException("Malformed config.xml", e);
-		}
-	}
 
 	private void deleteDirectory(File file) {
 		Path path = Paths.get(file.getAbsolutePath());

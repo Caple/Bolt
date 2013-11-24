@@ -1,6 +1,6 @@
 apps
 bin
-db
+bolt.db
 dist
 doc
 resources

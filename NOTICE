@@ -1,9 +1,9 @@
-This project uses libraries from several third parties.
-The license for each library is included in this file.
+This project uses some third-party libraries.
+The license for each is included within.
 
 
 
-Jetty
+Jetty - serves content and provides Websocket support
 ==============================================================
 
 Copyright 1995-2012 Mort Bay Consulting Pty Ltd.
@@ -35,51 +35,27 @@ granted provided that the copyright notice appears in all copies.
 
 
 
-OrientDB
-==============================================================                
+db4o - provides easy persistence
+==============================================================
 
-Copyright 1999-2010 (c) Luca Garulli
+Copyright (c) 2013 Versant
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-
-
-Javassist
-==============================================================                
-
-The Original Code is Javassist.
-
-The Initial Developer of the Original Code is Shigeru Chiba.
-Portions created by the Initial Developer are
-  Copyright (C) 1999- Shigeru Chiba. All Rights Reserved.
-
-Contributor(s): Bill Burke, Jason T. Greene
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 
-JGit
+JGit - used to interact with git
 ==============================================================
 
 Eclipse Distribution License - v 1.0
@@ -96,7 +72,7 @@ Redistribution and use in source and binary forms, with or without modification,
 
 
 
-JSch
+JSch - dependency of JGit
 ==============================================================
 
 Copyright (c) 2002-2012 Atsuhiko Yamanaka, JCraft,Inc. 
@@ -127,7 +103,8 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-Janino
+
+Janino - used for compiling classes on import/update
 ==============================================================
 
 Copyright (c) 2001-2010, Arno Unkrig

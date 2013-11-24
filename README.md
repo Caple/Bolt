@@ -1,2 +1,1 @@
-#[Wiki](https://github.com/Caple/Bolt/wiki)
-https://github.com/Caple/Bolt/wiki
+Please see: https://github.com/Caple/Bolt/wiki

@@ -1,8 +1,7 @@
 package pw.caple.bolt.api;
 
-import pw.caple.bolt.Bolt;
+import java.io.File;
 import pw.caple.bolt.socket.GenericClient;
-import com.orientechnologies.orient.object.db.OObjectDatabaseTx;
 
 /**
  * The main class of a Bolt web application. There should only be one such class
@@ -12,10 +11,24 @@ public abstract class Application {
 
 	protected Application() {}
 
+	private boolean initialized = false;
+	private File appPath;
 	private String name;
 
-	public final void initializeApplication(String name) {
-		this.name = name;
+	public final BoltConfig initialize(File appPath) {
+		if (initialized) {
+			throw new IllegalStateException("Application " + name + " already initialized.");
+		}
+		initialized = true;
+		this.appPath = appPath;
+		name = appPath.getName();
+		BoltConfig config = new BoltConfig();
+		configure(config);
+		return config;
+	}
+
+	protected File getStartupPath() {
+		return appPath;
 	}
 
 	/**
@@ -34,11 +47,9 @@ public abstract class Application {
 	}
 
 	/**
-	 * Returns the database object for this application.
+	 * Called to configure the application.
 	 */
-	protected final OObjectDatabaseTx getDB() {
-		return Bolt.aquireDB("local:db/" + name, "root", "root");
-	}
+	public abstract void configure(BoltConfig config);
 
 	/**
 	 * Called after the application is started.

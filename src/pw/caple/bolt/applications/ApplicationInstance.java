@@ -15,9 +15,6 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
 import javax.servlet.Servlet;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Unmarshaller;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
@@ -33,8 +30,9 @@ import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import pw.caple.bolt.api.Application;
-import pw.caple.bolt.applications.ApplicationXML.Content;
-import pw.caple.bolt.applications.ApplicationXML.Security.SSL;
+import pw.caple.bolt.api.BoltConfig;
+import pw.caple.bolt.api.BoltConfig.Content;
+import pw.caple.bolt.api.BoltConfig.SSLCert;
 import pw.caple.bolt.socket.SocketServlet;
 
 public class ApplicationInstance {
@@ -44,11 +42,11 @@ public class ApplicationInstance {
 	private final Server server;
 	private final List<Connector> connectors = new ArrayList<>();
 
-	private ApplicationXML xml;
 	private Application application;
 	private URLClassLoader classLoader;
 	private HandlerCollection handler;
 	private ProtocolEngine protocolEngine;
+	private BoltConfig config;
 
 	//TODO: update/import command + console
 	//TODO: make sure I want to stick with OrientDB
@@ -75,9 +73,8 @@ public class ApplicationInstance {
 
 	public void load() throws AppLoadException {
 		Log.getLogger(ApplicationInstance.class).info("Loading " + name + "...");
-		readXMLConfig();
 		loadClasses();
-		loadJavaApplication();
+		loadApplicationClass();
 		loadIntoWebServer();
 		if (application != null) {
 			application.onStartup();
@@ -120,22 +117,6 @@ public class ApplicationInstance {
 		}
 	}
 
-	private void readXMLConfig() throws AppLoadException {
-		try {
-			File appXMLFile = new File(root, "bolt.xml");
-			if (!appXMLFile.exists()) {
-				Log.getLogger(ApplicationInstance.class).warn("No bolt.xml found for " + name + System.getProperty("line.separator"));
-				xml = new ApplicationXML();
-				return;
-			}
-			JAXBContext jaxbContext = JAXBContext.newInstance(ApplicationXML.class);
-			Unmarshaller jaxbUnmarshaller = jaxbContext.createUnmarshaller();
-			xml = (ApplicationXML) jaxbUnmarshaller.unmarshal(appXMLFile);
-		} catch (JAXBException e) {
-			throw new AppLoadException("malformed bolt.xml in " + root.toString(), e);
-		}
-	}
-
 	private void loadClasses() throws AppLoadException {
 		try {
 			File binFolder = new File(root, "bin");
@@ -170,7 +151,7 @@ public class ApplicationInstance {
 		}
 	}
 
-	private void loadJavaApplication() throws AppLoadException {
+	private void loadApplicationClass() throws AppLoadException {
 		try {
 			if (classLoader.getURLs().length == 0) return;
 			ClassScanner reflection = new ClassScanner(classLoader);
@@ -181,7 +162,7 @@ public class ApplicationInstance {
 				throw new AppLoadException(name + " defines multiple Application classes. Only one is allowed per application.");
 			}
 			application = (Application) classes.get(0).newInstance();
-			application.initializeApplication(name);
+			config = application.initialize(root);
 			protocolEngine = new ProtocolEngine(classLoader);
 		} catch (InstantiationException | IllegalAccessException e) {
 			throw new AppLoadException("error initializing main class for " + name, e);
@@ -193,10 +174,12 @@ public class ApplicationInstance {
 		HandlerCollection serverHandler = (HandlerCollection) server.getHandler();
 
 		handler = new HandlerCollection();
-		String[] virtualHosts = xml.domain.toArray(new String[xml.domain.size()]);
-		String[] indexFiles = new String[] { "index.html", "index.php" };
+		String[] virtualHosts = config.getDomains().toArray(new String[config.getDomains().size()]);
+		String[] indexFiles = new String[] { "index.html", "index.php", "index.jsp" };
 
-		for (SSL ssl : xml.security.ssl) {
+		config.getCertificates();
+
+		for (SSLCert ssl : config.getCertificates()) {
 			SslContextFactory factory = new SslContextFactory();
 			File keystoreFile = new File(root, ssl.keystore);
 			File passwordFile = new File(root, ssl.password);
@@ -224,7 +207,6 @@ public class ApplicationInstance {
 			factory.setKeyStorePath(keystoreFile.toString());
 			factory.setKeyStorePassword(password);
 			factory.setKeyManagerPassword(password);
-			if (ssl.alias != null) factory.setCertAlias(ssl.alias);
 
 			HttpConfiguration config = new HttpConfiguration();
 			config.setSecureScheme("https");
@@ -248,11 +230,11 @@ public class ApplicationInstance {
 			}
 		}
 
-		for (Content content : xml.content) {
+		for (Content content : config.getContent()) {
 			if (content.folder == null) {
 				throw new AppLoadException("invalid content definition in bolt.xml of " + name);
 			}
-			File contentDirectory = new File(root, content.folder);
+			File contentDirectory = new File(content.folder);
 			if (!contentDirectory.exists()) {
 				throw new AppLoadException("content folder missing for" + name);
 			}
@@ -267,11 +249,11 @@ public class ApplicationInstance {
 			handler.addHandler(context);
 		}
 
-		if (xml.servlet.size() > 0) {
+		if (config.getServlets().size() > 0) {
 			ServletContextHandler servlets = new ServletContextHandler();
 			servlets.setClassLoader(classLoader);
 			if (virtualHosts.length > 0) servlets.setVirtualHosts(virtualHosts);
-			for (ApplicationXML.Servlet servletInfo : xml.servlet) {
+			for (pw.caple.bolt.api.BoltConfig.Servlet servletInfo : config.getServlets()) {
 				if (servletInfo.className == null || servletInfo.url == null) {
 					throw new AppLoadException("invalid servlet definition in bolt.xml of " + name);
 				}
@@ -291,7 +273,7 @@ public class ApplicationInstance {
 		ServletContextHandler socket = new ServletContextHandler();
 		socket.setClassLoader(classLoader);
 		if (virtualHosts.length > 0) socket.setVirtualHosts(virtualHosts);
-		ServletHolder holder = new ServletHolder(new SocketServlet(application, protocolEngine, xml.security.forceWSS));
+		ServletHolder holder = new ServletHolder(new SocketServlet(application, protocolEngine, config.getForcedWSS()));
 		socket.addServlet(holder, "/bolt/socket");
 		handler.addHandler(socket);
 

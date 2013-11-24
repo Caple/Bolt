@@ -5,6 +5,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.SecureRequestCustomizer;
@@ -17,16 +19,16 @@ import org.eclipse.jetty.server.handler.ResourceHandler;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import pw.caple.bolt.applications.ApplicationManager;
-import com.orientechnologies.orient.object.db.OObjectDatabasePool;
-import com.orientechnologies.orient.object.db.OObjectDatabaseTx;
-import com.orientechnologies.orient.server.OServer;
-import com.orientechnologies.orient.server.OServerMain;
+import com.db4o.Db4oEmbedded;
+import com.db4o.ObjectContainer;
+import com.db4o.config.EmbeddedConfiguration;
+import com.db4o.ext.ExtObjectContainer;
+import com.db4o.query.Predicate;
 
 public class Bolt {
 
 	private static Server webServer;
-	private static OServer database;
-	private static OObjectDatabasePool dbPool;
+	private static ExtObjectContainer db;
 	private static ApplicationManager appManager;
 
 	public static void shutdown() {
@@ -36,44 +38,61 @@ public class Bolt {
 			e.printStackTrace();
 		}
 		try {
-			database.shutdown();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		try {
 			webServer.stop();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		try {
+			db.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
-	public static OObjectDatabaseTx aquireDB(String url, String user, String password) {
-		return dbPool.acquire(url, user, password);
+	public static ObjectContainer getDB() {
+		return db.ext().openSession();
 	}
 
+	@SuppressWarnings("serial")
 	public static void main(String[] args) throws Exception {
 
-		String oServerConfig = "" +
-				"<?xml version='1.0' encoding='UTF-8' standalone='yes'?>" +
-				"<orient-server>" +
-				"	<network>" +
-				"		<protocols/>" +
-				"		<listeners/>" +
-				"	</network>" +
-				"	<users>" +
-				"		<user resources='*' password='7FC0855F8EDFA26915C22CE53885DA464361F4CA82D8BC4253488749D35C651E' name='root'/>" +
-				"		<user resources='connect,server.listDatabases,server.dblist' password='guest' name='guest'/>" +
-				"	</users>" +
-				"	<properties/>" +
-				"</orient-server>";
+		File dbFile = new File("bolt.db");
+		if (dbFile.exists()) dbFile.delete();
 
-		// Setup and start object database server
-		System.setProperty("ORIENTDB_HOME", "db/");
-		database = OServerMain.create().startup(oServerConfig);
-		database.activate();
-		dbPool = new OObjectDatabasePool();
-		dbPool.setup(1, 50);
-		System.out.println();
+		EmbeddedConfiguration config = Db4oEmbedded.newConfiguration();
+		db = Db4oEmbedded.openFile(config, "bolt.db").ext();
+
+		List<DBTest> results;
+		Benchmark bm = new Benchmark();
+
+		List<DBTest> tests = new ArrayList<DBTest>();
+		for (int i = 0; i < 1000000; i++) {
+			tests.add(new DBTest("Test" + i, i));
+		}
+		bm.lap("create objects (jvm)");
+
+		ObjectContainer container = getDB();
+		for (DBTest test : tests) {
+			container.store(test);
+		}
+		bm.lap("insert");
+		container.close();
+		bm.lap("close sssion");
+
+		container = getDB();
+		results = db.query(new Predicate<DBTest>() {
+			@Override
+			public boolean match(DBTest obj) {
+				return obj.id == 1500;
+			}
+		});
+		container.close();
+		bm.lap("native query");
+
+		for (DBTest test : results) {
+			System.out.println(test.name);
+		}
+		bm.lap("read results");
 
 		// Configure connection thread pooling
 		QueuedThreadPool threadPool = new QueuedThreadPool();
