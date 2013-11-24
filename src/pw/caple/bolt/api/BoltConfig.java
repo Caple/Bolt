@@ -71,7 +71,7 @@ public class BoltConfig {
 		contentList.add(content);
 	}
 
-	public void addServlet(Class clazz, String url) {
+	public void addServlet(Class<?> clazz, String url) {
 		Servlet servlet = new Servlet();
 		servlet.className = clazz.getCanonicalName();
 		servlet.url = url.toString();

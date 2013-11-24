@@ -5,8 +5,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.List;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.SecureRequestCustomizer;
@@ -23,7 +21,6 @@ import com.db4o.Db4oEmbedded;
 import com.db4o.ObjectContainer;
 import com.db4o.config.EmbeddedConfiguration;
 import com.db4o.ext.ExtObjectContainer;
-import com.db4o.query.Predicate;
 
 public class Bolt {
 
@@ -53,7 +50,6 @@ public class Bolt {
 		return db.ext().openSession();
 	}
 
-	@SuppressWarnings("serial")
 	public static void main(String[] args) throws Exception {
 
 		File dbFile = new File("bolt.db");
@@ -61,38 +57,6 @@ public class Bolt {
 
 		EmbeddedConfiguration config = Db4oEmbedded.newConfiguration();
 		db = Db4oEmbedded.openFile(config, "bolt.db").ext();
-
-		List<DBTest> results;
-		Benchmark bm = new Benchmark();
-
-		List<DBTest> tests = new ArrayList<DBTest>();
-		for (int i = 0; i < 1000000; i++) {
-			tests.add(new DBTest("Test" + i, i));
-		}
-		bm.lap("create objects (jvm)");
-
-		ObjectContainer container = getDB();
-		for (DBTest test : tests) {
-			container.store(test);
-		}
-		bm.lap("insert");
-		container.close();
-		bm.lap("close sssion");
-
-		container = getDB();
-		results = db.query(new Predicate<DBTest>() {
-			@Override
-			public boolean match(DBTest obj) {
-				return obj.id == 1500;
-			}
-		});
-		container.close();
-		bm.lap("native query");
-
-		for (DBTest test : results) {
-			System.out.println(test.name);
-		}
-		bm.lap("read results");
 
 		// Configure connection thread pooling
 		QueuedThreadPool threadPool = new QueuedThreadPool();
