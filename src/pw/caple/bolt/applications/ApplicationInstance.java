@@ -2,6 +2,7 @@ package pw.caple.bolt.applications;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -161,10 +162,11 @@ public class ApplicationInstance {
 			} else if (classes.size() > 1) {
 				throw new AppLoadException(name + " defines multiple Application classes. Only one is allowed per application.");
 			}
-			application = (Application) classes.get(0).newInstance();
-			config = application.initialize(root);
+			application = (Application) classes.get(0).getDeclaredConstructor(File.class).newInstance(root);
+			BoltConfig config = new BoltConfig();
+			application.configure(config);
 			protocolEngine = new ProtocolEngine(classLoader);
-		} catch (InstantiationException | IllegalAccessException e) {
+		} catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchMethodException | SecurityException e) {
 			throw new AppLoadException("error initializing main class for " + name, e);
 		}
 	}

@@ -1,6 +1,8 @@
 package pw.caple.bolt.api;
 
 import java.io.File;
+import java.sql.Connection;
+import java.sql.SQLException;
 import pw.caple.bolt.socket.GenericClient;
 
 /**
@@ -11,20 +13,12 @@ public abstract class Application {
 
 	protected Application() {}
 
-	private boolean initialized = false;
 	private File appPath;
 	private String name;
 
-	public final BoltConfig initialize(File appPath) {
-		if (initialized) {
-			throw new IllegalStateException("Application " + name + " already initialized.");
-		}
-		initialized = true;
+	public Application(File appPath) {
 		this.appPath = appPath;
 		name = appPath.getName();
-		BoltConfig config = new BoltConfig();
-		configure(config);
-		return config;
 	}
 
 	protected File getStartupPath() {
@@ -44,6 +38,19 @@ public abstract class Application {
 	 */
 	public Client getNewClient() {
 		return new GenericClient();
+	}
+
+	/**
+	 * Retrieves a connection from this application's database pool. If no
+	 * database information was provided during configuration, the current
+	 * database configuration is invalid, or the connection pool is closed, then
+	 * this method will throw a SQLException.
+	 * 
+	 * @throws SQLException
+	 */
+	protected Connection getDatabase() throws SQLException {
+		//TODO complete database connection method
+		throw new SQLException("getDatabase() method is not finished. Sorry.");
 	}
 
 	/**

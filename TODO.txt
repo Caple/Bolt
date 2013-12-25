@@ -1,5 +1,3 @@
-Remove db40
-Go back to apache license
 include a decent ORM instead
 Add database setup to Bolt config
 Load applications as jars OR loose files
