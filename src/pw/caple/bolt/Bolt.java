@@ -17,15 +17,10 @@ import org.eclipse.jetty.server.handler.ResourceHandler;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import pw.caple.bolt.applications.ApplicationManager;
-import com.db4o.Db4oEmbedded;
-import com.db4o.ObjectContainer;
-import com.db4o.config.EmbeddedConfiguration;
-import com.db4o.ext.ExtObjectContainer;
 
 public class Bolt {
 
 	private static Server webServer;
-	private static ExtObjectContainer db;
 	private static ApplicationManager appManager;
 
 	public static void shutdown() {
@@ -39,24 +34,12 @@ public class Bolt {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		try {
-			db.close();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
-	public static ObjectContainer getDB() {
-		return db.ext().openSession();
 	}
 
 	public static void main(String[] args) throws Exception {
 
 		File dbFile = new File("bolt.db");
 		if (dbFile.exists()) dbFile.delete();
-
-		EmbeddedConfiguration config = Db4oEmbedded.newConfiguration();
-		db = Db4oEmbedded.openFile(config, "bolt.db").ext();
 
 		// Configure connection thread pooling
 		QueuedThreadPool threadPool = new QueuedThreadPool();
@@ -97,9 +80,7 @@ public class Bolt {
 		webServer.setHandler(serverHandler);
 
 		writeResourceToDisk("bolt.js");
-		writeResourceToDisk("console.html");
 		addResourceHandler(serverHandler, "bolt.js", "/bolt");
-		addResourceHandler(serverHandler, "console.html", "/bolt/console");
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			@Override
@@ -107,12 +88,10 @@ public class Bolt {
 				shutdown();
 			}
 		});
-
 		webServer.start();
 		appManager = new ApplicationManager(webServer);
 		appManager.reloadAll();
 		webServer.join();
-		shutdown();
 	}
 
 	private static void writeResourceToDisk(String resource) {

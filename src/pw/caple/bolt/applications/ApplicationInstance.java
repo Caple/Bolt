@@ -181,30 +181,28 @@ public class ApplicationInstance {
 
 		for (SSLCert ssl : config.getCertificates()) {
 			SslContextFactory factory = new SslContextFactory();
-			File keystoreFile = new File(root, ssl.keystore);
-			File passwordFile = new File(root, ssl.password);
-			if (!keystoreFile.exists()) {
+			if (!ssl.keystore.exists()) {
 				Log.getLogger(ApplicationInstance.class).warn("=======================================");
-				Log.getLogger(ApplicationInstance.class).warn("SSL certificate error. Could not find keystore " + keystoreFile.toString() + ".");
+				Log.getLogger(ApplicationInstance.class).warn("SSL certificate error. Could not find keystore " + ssl.keystore.toString() + ".");
 				Log.getLogger(ApplicationInstance.class).warn("=======================================");
 				break;
 			}
-			if (!passwordFile.exists()) {
+			if (!ssl.password.exists()) {
 				Log.getLogger(ApplicationInstance.class).warn("=======================================");
-				Log.getLogger(ApplicationInstance.class).warn("SSL certificate error. Could not find password file " + passwordFile.toString() + ".");
+				Log.getLogger(ApplicationInstance.class).warn("SSL certificate error. Could not find password file " + ssl.password.toString() + ".");
 				Log.getLogger(ApplicationInstance.class).warn("=======================================");
 				break;
 			}
 			String password = null;
 			try {
-				byte[] bytes = Files.readAllBytes(passwordFile.toPath());
+				byte[] bytes = Files.readAllBytes(ssl.password.toPath());
 				ByteBuffer buffer = ByteBuffer.wrap(bytes);
 				password = Charset.defaultCharset().decode(buffer).toString();
 			} catch (IOException e) {
 				e.printStackTrace();
 				return;
 			}
-			factory.setKeyStorePath(keystoreFile.toString());
+			factory.setKeyStorePath(ssl.keystore.toString());
 			factory.setKeyStorePassword(password);
 			factory.setKeyManagerPassword(password);
 
@@ -234,13 +232,12 @@ public class ApplicationInstance {
 			if (content.folder == null) {
 				throw new AppLoadException("invalid content definition in bolt.xml of " + name);
 			}
-			File contentDirectory = new File(content.folder);
-			if (!contentDirectory.exists()) {
+			if (!content.folder.exists()) {
 				throw new AppLoadException("content folder missing for" + name);
 			}
 			ResourceHandler resource = new ResourceHandler();
 			resource.setWelcomeFiles(indexFiles);
-			resource.setResourceBase(new File(root, content.folder).toString());
+			resource.setResourceBase(content.folder.toString());
 			ContextHandler context = new ContextHandler();
 			context.setClassLoader(classLoader);
 			if (virtualHosts.length > 0) context.setVirtualHosts(virtualHosts);

@@ -14,7 +14,7 @@ public class BoltConfig {
 	private boolean forceWSS = false;
 
 	public static class Content {
-		public String folder;
+		public File folder;
 		public String url = "/";
 		public boolean secure = false;
 	}
@@ -26,8 +26,8 @@ public class BoltConfig {
 	}
 
 	public static class SSLCert {
-		public String keystore;
-		public String password;
+		public File keystore;
+		public File password;
 		public String ip;
 	}
 
@@ -66,7 +66,7 @@ public class BoltConfig {
 	public void addContent(File folder, String url) {
 		Content content = new Content();
 		content.url = url.toString();
-		content.folder = folder.toString();
+		content.folder = folder;
 		content.secure = false;
 		contentList.add(content);
 	}
@@ -80,8 +80,8 @@ public class BoltConfig {
 
 	public void addSSL(File keystore, File passwordFile, InetAddress ip) {
 		SSLCert cert = new SSLCert();
-		cert.keystore = keystore.toString();
-		cert.password = passwordFile.toString();
+		cert.keystore = keystore;
+		cert.password = passwordFile;
 		cert.ip = ip.toString();
 		certList.add(cert);
 	}

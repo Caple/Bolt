@@ -4,8 +4,18 @@ import java.util.Arrays;
 import pw.caple.bolt.api.Client;
 import pw.caple.bolt.api.Protocol;
 import pw.caple.bolt.api.Protocol.SecurityClearance;
+import pw.caple.bolt.api.TypeParser;
 
 public class User {
+
+	static TypeParser<User> getParser() {
+		return new TypeParser<User>() {
+			@Override
+			public User parse(String string) {
+				return null;
+			}
+		};
+	}
 
 	private int id;
 

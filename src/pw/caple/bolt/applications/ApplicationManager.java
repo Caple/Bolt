@@ -65,11 +65,12 @@ public class ApplicationManager {
 				e.printStackTrace();
 			}
 		}
-		if (new File("bolt.xml").exists()) {
+		if (new File("bin").exists()) {
 			// load application in server root.
 			// this logic exists to allow easy debugging of new projects
 			try {
 				File root = new File(".").getCanonicalFile();
+				if (root.getName().equals("Bolt")) return;
 				ApplicationInstance app = new ApplicationInstance(webServer, root);
 				try {
 					app.load();

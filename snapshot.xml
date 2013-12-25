@@ -9,13 +9,27 @@
 	<target name="run" depends="clean">
 		<mkdir dir="dist/" />
 		<mkdir dir="dist/bin" />
+		<mkdir dir="dist/src" />
 		<path id="classpath">
 			<fileset dir="lib">
 				<include name="**/*.jar" />
 			</fileset>
 		</path>
 		<javac srcdir="src" destdir="dist/bin" classpathref="classpath" includeantruntime="false" debug="true" />
-		<javadoc sourcepath="src" destdir="dist/jdoc" classpathref="classpath" />
+		<copy todir="dist/src">
+			<fileset dir="src" />
+			<fileset dir="doc/db4oj/core/src" />
+		</copy>
+		<javadoc sourcepath="dist/src" destdir="dist/jdoc" classpathref="classpath" additionalparam="-quiet">
+			<classpath>
+				<fileset dir="lib">
+					<include name="**/*.jar" />
+				</fileset>
+				<fileset dir="doc/db4oj/lib">
+					<include name="**/*.jar" />
+				</fileset>
+			</classpath>
+		</javadoc>
 		<jar jarfile="dist/dependencies.jar">
 			<zipgroupfileset dir="lib/">
 				<include name="**/*.jar" />
@@ -39,6 +53,7 @@
 		</jar>
 		<delete file="dist/dependencies.jar" />
 		<delete dir="dist/bin" />
+		<delete dir="dist/src" />
 		<delete dir="dist/jdoc" />
 	</target>
 

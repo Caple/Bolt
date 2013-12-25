@@ -67,6 +67,10 @@ public class ClassScanner {
 		return methods;
 	}
 
+	public List<Class<?>> getAllClasses() {
+		return classes;
+	}
+
 	private List<Class<?>> findLooseClasses(Path path) {
 		final List<Class<?>> classes = new ArrayList<>();
 		try {

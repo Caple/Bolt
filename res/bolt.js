@@ -114,7 +114,15 @@ server.internal.events.onTextMessage = function(data) {
 		var callback = server.internal.callbacks[clientMessageID];
 		delete server.internal.callbacks[clientMessageID];
 		if (args.length === 2) {
-			callback(args[1]);
+			var arg = args[1];
+			if (arg === "false") {
+				arg = false;
+			} else if (arg === "true") {
+				arg = true;
+			} else if (!isNaN(parseFloat(arg)) && isFinite(arg)) {
+				arg = Number(arg);
+			}
+			callback(arg);
 		} else {
 			callback();
 		}

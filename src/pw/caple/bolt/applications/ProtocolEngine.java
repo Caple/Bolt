@@ -1,6 +1,7 @@
 package pw.caple.bolt.applications;
 
 import java.lang.reflect.Array;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -16,36 +17,41 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import pw.caple.bolt.api.Client;
 import pw.caple.bolt.api.Protocol;
+import pw.caple.bolt.api.SetParser;
+import pw.caple.bolt.api.TypeParser;
 
 public class ProtocolEngine {
 
 	//TODO: search jars and other places than just bin
 
 	private final Map<String, List<Method>> methods = new ConcurrentHashMap<>();
+	private final Map<Class<?>, TypeParser<?>> typeParsers = new ConcurrentHashMap<>();
 	private final ReservedProtocol reservedProtocol;
 	private final URLClassLoader classLoader;
 
 	public ProtocolEngine(URLClassLoader classLoader) {
 		this.classLoader = classLoader;
 		reservedProtocol = new ReservedProtocol(this);
+		loadCustomParsers();
+		loadDefaultParsers();
 		loadProtocolMethods();
 	}
 
 	private void loadProtocolMethods() {
-		ClassScanner reflection = new ClassScanner(classLoader);
-		for (Method method : reflection.getAnnotatedMethods(Protocol.class)) {
+		ClassScanner scanner = new ClassScanner(classLoader);
+		for (Method method : scanner.getAnnotatedMethods(Protocol.class)) {
 			if (Modifier.isStatic(method.getModifiers())) {
 				if (!method.isAccessible()) {
 					method.setAccessible(true);
 				}
 				String methodName = method.getName();
-				if (!methods.containsKey(method.getName())) {
+				if (!methods.containsKey(methodName)) {
 					methods.put(methodName, new CopyOnWriteArrayList<Method>());
 				}
 				List<Method> methodList = methods.get(methodName);
 				methodList.add(method);
 			} else {
-				throw new RuntimeException("Error on method " + method.getName() + "() - Method should be static.");
+				throw new RuntimeException("Error on method " + method.getName() + "(...) - Method must be static.");
 			}
 		}
 
@@ -57,6 +63,182 @@ public class ProtocolEngine {
 			List<Method> methodList = methods.get(methodName);
 			methodList.add(method);
 		}
+
+	}
+
+	private void loadCustomParsers() {
+		ClassScanner scanner = new ClassScanner(classLoader);
+		for (Class<?> clazz : scanner.getAllClasses()) {
+			for (Field field : clazz.getDeclaredFields()) {
+				if (field.isAnnotationPresent(SetParser.class)) {
+					if (TypeParser.class != field.getType()) {
+						throw new RuntimeException("Error on " + SetParser.class.getSimpleName() + " field [" + field.getName() + "] of type " + clazz.getSimpleName() + " - Wrong type.");
+					}
+					if (!Modifier.isStatic(field.getModifiers())) {
+						throw new RuntimeException("Error on " + SetParser.class.getSimpleName() + " field [" + field.getName() + "] of type " + clazz.getSimpleName() + " - Must be static.");
+					}
+					if (!field.isAccessible()) field.setAccessible(true);
+					try {
+						TypeParser<?> value = (TypeParser<?>) field.get(null);
+						typeParsers.put(clazz, value);
+						break;
+					} catch (IllegalArgumentException | IllegalAccessException e) {
+						e.printStackTrace();
+					}
+				}
+
+			}
+		}
+	}
+
+	private void loadDefaultParsers() {
+		TypeParser<?> parser;
+
+		parser = new TypeParser<String>() {
+			@Override
+			public String parse(String string) {
+				return string;
+			}
+		};
+		typeParsers.put(String.class, parser);
+
+		parser = new TypeParser<Boolean>() {
+			@Override
+			public Boolean parse(String string) {
+				if (string.equals("true") || string.equals("yes") || string.equals("1")) {
+					return true;
+				} else if (string.equals("false") || string.equals("no") || string.equals("0")) {
+					return false;
+				} else {
+					return null;
+				}
+			}
+		};
+		typeParsers.put(Boolean.class, parser);
+		typeParsers.put(boolean.class, parser);
+
+		parser = new TypeParser<Byte>() {
+			@Override
+			public Byte parse(String string) {
+				try {
+					return Byte.parseByte(string);
+				} catch (NumberFormatException e) {
+					return null;
+				}
+			}
+		};
+		typeParsers.put(Byte.class, parser);
+		typeParsers.put(byte.class, parser);
+
+		parser = new TypeParser<Short>() {
+			@Override
+			public Short parse(String string) {
+				try {
+					return Short.parseShort(string);
+				} catch (NumberFormatException e) {
+					return null;
+				}
+			}
+		};
+		typeParsers.put(Short.class, parser);
+		typeParsers.put(short.class, parser);
+
+		parser = new TypeParser<Integer>() {
+			@Override
+			public Integer parse(String string) {
+				try {
+					return Integer.parseInt(string);
+				} catch (NumberFormatException e) {
+					return null;
+				}
+			}
+		};
+		typeParsers.put(Integer.class, parser);
+		typeParsers.put(int.class, parser);
+
+		parser = new TypeParser<Long>() {
+			@Override
+			public Long parse(String string) {
+				try {
+					return Long.parseLong(string);
+				} catch (NumberFormatException e) {
+					return null;
+				}
+			}
+		};
+		typeParsers.put(Long.class, parser);
+		typeParsers.put(long.class, parser);
+
+		parser = new TypeParser<Float>() {
+			@Override
+			public Float parse(String string) {
+				try {
+					return Float.parseFloat(string);
+				} catch (NumberFormatException e) {
+					return null;
+				}
+			}
+		};
+		typeParsers.put(Float.class, parser);
+		typeParsers.put(float.class, parser);
+
+		parser = new TypeParser<Double>() {
+			@Override
+			public Double parse(String string) {
+				try {
+					return Double.parseDouble(string);
+				} catch (NumberFormatException e) {
+					return null;
+				}
+			}
+		};
+		typeParsers.put(Double.class, parser);
+		typeParsers.put(double.class, parser);
+
+		parser = new TypeParser<Character>() {
+			@Override
+			public Character parse(String string) {
+				if (string.length() == 1) {
+					return string.charAt(0);
+				} else {
+					return null;
+				}
+			}
+		};
+		typeParsers.put(Character.class, parser);
+		typeParsers.put(char.class, parser);
+
+		parser = new TypeParser<Date>() {
+			@Override
+			public Date parse(String string) {
+				try {
+					long utc = Long.parseLong(string);
+					return new Date(utc);
+				} catch (NumberFormatException e) {}
+				DateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+				try {
+					return format.parse(string.replace('/', '-'));
+				} catch (ParseException ignore) {}
+				format = new SimpleDateFormat("HH:mm:ss");
+				try {
+					return format.parse(string);
+				} catch (ParseException ignore) {}
+				return null;
+			}
+		};
+		typeParsers.put(Date.class, parser);
+
+		parser = new TypeParser<BigDecimal>() {
+			@Override
+			public BigDecimal parse(String string) {
+				try {
+					return new BigDecimal(string);
+				} catch (NumberFormatException e) {
+					return null;
+				}
+			}
+		};
+		typeParsers.put(BigDecimal.class, parser);
 
 	}
 
@@ -135,78 +317,8 @@ public class ProtocolEngine {
 	}
 
 	private Object parseParameter(Class<?> type, String string) {
-		if (type == String.class) {
-			return string;
-		} else if (type == boolean.class || type == Boolean.class) {
-			if (string.equals("true") || string.equals("yes") || string.equals("1")) {
-				return true;
-			} else if (string.equals("false") || string.equals("no") || string.equals("0")) {
-				return false;
-			} else {
-				return null;
-			}
-		} else if (type == byte.class || type == Byte.class) {
-			try {
-				return Byte.parseByte(string);
-			} catch (NumberFormatException e) {
-				return null;
-			}
-		} else if (type == short.class || type == Short.class) {
-			try {
-				return Short.parseShort(string);
-			} catch (NumberFormatException e) {
-				return null;
-			}
-		} else if (type == int.class || type == Integer.class) {
-			try {
-				return Integer.parseInt(string);
-			} catch (NumberFormatException e) {
-				return null;
-			}
-		} else if (type == long.class || type == Long.class) {
-			try {
-				return Long.parseLong(string);
-			} catch (NumberFormatException e) {
-				return null;
-			}
-		} else if (type == float.class || type == Float.class) {
-			try {
-				return Float.parseFloat(string);
-			} catch (NumberFormatException e) {
-				return null;
-			}
-		} else if (type == double.class || type == Double.class) {
-			try {
-				return Double.parseDouble(string);
-			} catch (NumberFormatException e) {
-				return null;
-			}
-		} else if (type == char.class || type == Character.class) {
-			if (string.length() == 1) {
-				return string.charAt(0);
-			} else {
-				return null;
-			}
-		} else if (type == Date.class) {
-			try {
-				long utc = Long.parseLong(string);
-				return new Date(utc);
-			} catch (NumberFormatException e) {}
-			DateFormat format = new SimpleDateFormat("yyyy-MM-dd");
-			try {
-				return format.parse(string.replace('/', '-'));
-			} catch (ParseException ignore) {}
-			format = new SimpleDateFormat("HH:mm:ss");
-			try {
-				return format.parse(string);
-			} catch (ParseException ignore) {}
-			return null;
-		} else if (type == BigDecimal.class) {
-			try {
-				return new BigDecimal(string);
-			} catch (NumberFormatException e) {
-				return null;
-			}
+		if (typeParsers.containsKey(type)) {
+			return typeParsers.get(type).parse(string);
 		} else {
 			throw new RuntimeException("unsupported parameter type [" + type.getSimpleName() + "] found in a protocol method");
 		}
