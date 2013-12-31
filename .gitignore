@@ -4,3 +4,4 @@ bolt.db
 dist
 doc
 resources
+/target

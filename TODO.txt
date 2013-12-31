@@ -1,3 +1,4 @@
-include a decent ORM instead
-Add database setup to Bolt config
-Load applications as jars OR loose files
+include Hibernate
+bolt-db.cfg
+finish "server console"
+git updates and imports
